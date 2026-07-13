@@ -1,0 +1,508 @@
+/* ============================================================
+   SPACE BUILDERS — kid UI + boot screen (K-2 free-build edition)
+   Big, bright, bouncy. Huge tap targets. Tablet/Chromebook first.
+   ============================================================ */
+
+:root {
+  --font: 'Baloo 2', 'Fredoka', 'Arial Rounded MT Bold', 'Comic Sans MS', system-ui, sans-serif;
+  --panel: #fffdf6;
+  --panel-2: #fff;
+  --ink: #2b2f45;
+  --ink-dim: #6b7189;
+  --shadow: 0 10px 0 rgba(0,0,0,0.10), 0 18px 34px rgba(0,0,0,0.34);
+  --shadow-sm: 0 5px 0 rgba(0,0,0,0.10), 0 8px 16px rgba(0,0,0,0.30);
+  --bounce: 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #05060e;
+  color: var(--ink);
+  font-family: var(--font);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#game-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  z-index: 0;
+  touch-action: none;
+}
+
+#ui-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+/* only real controls catch taps — empty space lets you drag the moon */
+.kid-panel, .kid-round, .kid-tool, .kid-blast, .kid-bubble,
+.kid-tab, .kid-card, .kid-bubble-rm { pointer-events: auto; }
+
+.hidden { display: none !important; }
+
+/* ============================================================
+   TOP-LEFT — title + star counter
+   ============================================================ */
+.kid-topbar {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kid-logo {
+  font-size: clamp(20px, 3vw, 30px);
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.5px;
+  text-shadow: 0 3px 0 rgba(0,0,0,0.35), 0 0 18px rgba(120,170,255,0.5);
+}
+.kid-logo b { color: #ffd166; }
+.kid-counter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 6px 10px;
+  background: var(--panel);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  font-weight: 800;
+}
+.kid-counter-star { font-size: 22px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2)); }
+.kid-counter-num {
+  font-size: 22px;
+  color: var(--ink);
+  min-width: 20px;
+  text-align: center;
+  transition: transform var(--bounce);
+}
+.kid-counter-num.pop { animation: pop 380ms var(--bounce); }
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.6); color: #ef476f; }
+  100% { transform: scale(1); }
+}
+
+/* ============================================================
+   TOP-RIGHT — sound + clear
+   ============================================================ */
+.kid-actions {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: 14px;
+  display: flex;
+  gap: 10px;
+}
+.kid-round {
+  width: clamp(52px, 8vw, 66px);
+  height: clamp(52px, 8vw, 66px);
+  border: none;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  font-size: clamp(24px, 4vw, 30px);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform var(--bounce), background 150ms;
+}
+.kid-round:active { transform: scale(0.9); }
+.kid-round.off { background: #d7dae6; filter: grayscale(0.6); }
+.kid-clear.armed { background: #ffd166; animation: wobble 500ms ease-in-out infinite; }
+@keyframes wobble {
+  0%,100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+
+/* ============================================================
+   ONBOARDING HINT
+   ============================================================ */
+.kid-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 230px;
+  transform: translateX(-50%);
+  background: #ffd166;
+  color: #4a3b12;
+  font-weight: 800;
+  font-size: clamp(16px, 2.6vw, 22px);
+  padding: 12px 22px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  animation: bob 1.4s ease-in-out infinite;
+  transition: opacity 500ms, transform 500ms;
+}
+.kid-hint.gone { opacity: 0; transform: translateX(-50%) translateY(20px); }
+@keyframes bob {
+  0%,100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-8px); }
+}
+
+/* ============================================================
+   BOTTOM DOCK — tools · build panel · blast off
+   ============================================================ */
+.kid-dock {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 12px;
+  pointer-events: none;
+}
+
+/* --- tool cluster (Move / Turn / Erase) --- */
+.kid-tools {
+  display: flex;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.kid-tool-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.kid-tool {
+  width: clamp(56px, 8.5vw, 72px);
+  height: clamp(56px, 8.5vw, 72px);
+  border: 4px solid #fff;
+  border-radius: 22px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  font-size: clamp(26px, 4.4vw, 34px);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform var(--bounce), border-color 150ms, background 150ms;
+}
+.kid-tool:active { transform: scale(0.9); }
+.kid-tool.active {
+  border-color: #06d6a0;
+  background: #eafff8;
+  box-shadow: var(--shadow-sm), 0 0 0 4px rgba(6,214,160,0.35);
+}
+.kid-tool .kid-tool-ic { line-height: 1; }
+.kid-tool-lbl {
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.4);
+}
+/* Turn is only meaningful while building — dim it otherwise */
+.kid-tool-wrap:nth-child(2) .kid-tool { opacity: 0.45; }
+.kid-tool-wrap:nth-child(2) .kid-tool.show { opacity: 1; }
+
+/* --- build panel --- */
+.kid-panel {
+  flex: 1 1 auto;
+  max-width: 760px;
+  background: var(--panel);
+  border-radius: 26px;
+  box-shadow: var(--shadow);
+  padding: 10px 12px 12px;
+  transition: transform 120ms;
+}
+.kid-panel.nope { animation: shake 320ms ease; }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+
+.kid-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+}
+.kid-tabs::-webkit-scrollbar { display: none; }
+.kid-tab {
+  --cat: #4d96ff;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: #eef0f6;
+  color: var(--ink-dim);
+  font-family: var(--font);
+  font-weight: 800;
+  font-size: clamp(13px, 2vw, 16px);
+  cursor: pointer;
+  transition: transform var(--bounce), background 150ms, color 150ms;
+}
+.kid-tab:active { transform: scale(0.94); }
+.kid-tab-ic { font-size: 18px; line-height: 1; }
+.kid-tab.active {
+  background: var(--cat);
+  color: #fff;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+}
+
+.kid-cards {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 6px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+}
+.kid-cards::-webkit-scrollbar { height: 8px; }
+.kid-cards::-webkit-scrollbar-thumb { background: #d3d7e4; border-radius: 8px; }
+.kid-card {
+  --cat: #4d96ff;
+  flex: 0 0 auto;
+  width: clamp(80px, 12vw, 98px);
+  height: clamp(92px, 14vw, 108px);
+  border: 4px solid #fff;
+  border-radius: 20px;
+  background: var(--panel-2);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  transition: transform var(--bounce), border-color 150ms;
+}
+.kid-card:active { transform: scale(0.92); }
+.kid-card-ic {
+  font-size: clamp(34px, 5.5vw, 44px);
+  line-height: 1;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,0.18));
+}
+.kid-card-nm {
+  font-size: clamp(11px, 1.7vw, 13px);
+  font-weight: 800;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.05;
+}
+.kid-card.active {
+  border-color: var(--cat);
+  transform: translateY(-8px) scale(1.04);
+  box-shadow: var(--shadow), 0 0 0 5px color-mix(in srgb, var(--cat) 40%, transparent);
+}
+
+/* --- BLAST OFF --- */
+.kid-blast {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: clamp(78px, 11vw, 104px);
+  height: clamp(78px, 11vw, 104px);
+  border: 5px solid #fff;
+  border-radius: 28px;
+  background: linear-gradient(160deg, #ff8c42, #ef476f);
+  box-shadow: var(--shadow);
+  color: #fff;
+  cursor: pointer;
+  transition: transform var(--bounce);
+}
+.kid-blast:active { transform: scale(0.92); }
+.kid-blast-ic { font-size: clamp(30px, 5vw, 42px); line-height: 1; }
+.kid-blast-tx {
+  font-size: clamp(11px, 1.6vw, 13px);
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  white-space: pre-line;
+  text-align: center;
+  line-height: 1;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.25);
+}
+.kid-blast.go { animation: blastPulse 500ms var(--bounce); }
+@keyframes blastPulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18) rotate(-4deg); }
+  100% { transform: scale(1); }
+}
+
+/* ============================================================
+   SELECT BUBBLE — tap a building to see/erase just that one
+   ============================================================ */
+.kid-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: 236px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 16px;
+  background: var(--panel);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  animation: pop 300ms var(--bounce);
+}
+.kid-bubble-ic { font-size: 28px; }
+.kid-bubble-nm { font-weight: 800; font-size: 18px; color: var(--ink); }
+.kid-bubble-rm {
+  width: 46px; height: 46px;
+  border: none;
+  border-radius: 50%;
+  background: #ffe0e6;
+  font-size: 24px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform var(--bounce);
+}
+.kid-bubble-rm:active { transform: scale(0.88); }
+
+/* ============================================================
+   HAND-MADE ART ICONS (low-poly PNGs)
+   ============================================================ */
+.kid-tab-ic-img, .kid-tool-ic-img, .kid-counter-star-img,
+.kid-blast-ic-img, .boot-logo-rocket, #boot-moon {
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.kid-counter-star-img {
+  width: 26px; height: 26px;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25));
+}
+.kid-tab-ic-img {
+  width: 26px; height: 26px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.25));
+}
+.kid-tool-ic-img {
+  width: clamp(34px, 5.4vw, 44px);
+  height: clamp(34px, 5.4vw, 44px);
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.28));
+}
+.kid-blast-ic-img {
+  width: clamp(34px, 5.6vw, 46px);
+  height: clamp(34px, 5.6vw, 46px);
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35));
+}
+
+/* ============================================================
+   BOOT SCREEN
+   ============================================================ */
+#boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(120% 90% at 50% 10%, #1a2a5e, #0a0f24 60%, #05060e);
+  transition: opacity 850ms ease;
+}
+#boot-screen.fade-out { opacity: 0; pointer-events: none; }
+.boot-inner { text-align: center; padding: 24px; }
+.boot-logo {
+  font-size: clamp(44px, 11vw, 96px);
+  font-weight: 800;
+  color: #fff;
+  line-height: 0.95;
+  text-shadow: 0 6px 0 rgba(0,0,0,0.3), 0 0 40px rgba(120,170,255,0.55);
+  animation: floaty 3s ease-in-out infinite;
+}
+.boot-logo span { display: block; color: #ffd166; }
+.boot-logo-rocket {
+  width: clamp(52px, 11vw, 104px);
+  height: clamp(52px, 11vw, 104px);
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.1em;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.4));
+  animation: floaty 2.4s ease-in-out infinite;
+}
+@keyframes floaty {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+/* big low-poly moon drifting behind the title */
+#boot-moon {
+  position: absolute;
+  top: 6%;
+  right: 7%;
+  width: clamp(120px, 24vw, 250px);
+  height: clamp(120px, 24vw, 250px);
+  opacity: 0.9;
+  filter: drop-shadow(0 10px 30px rgba(80,120,220,0.4));
+  animation: floaty 5s ease-in-out infinite;
+  z-index: 0;
+}
+.boot-inner { position: relative; z-index: 1; }
+.boot-sub {
+  margin-top: 14px;
+  color: #aeb9e0;
+  font-size: clamp(14px, 2.4vw, 20px);
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.boot-bar {
+  margin: 30px auto 6px;
+  width: min(320px, 70vw);
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  overflow: hidden;
+}
+#boot-progress {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #06d6a0, #4d96ff);
+  transition: width 700ms ease;
+}
+.boot-btns { margin-top: 26px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+#boot-start, #boot-continue {
+  font-family: var(--font);
+  font-weight: 800;
+  border: 5px solid #fff;
+  border-radius: 26px;
+  cursor: pointer;
+  transition: transform var(--bounce);
+  box-shadow: var(--shadow);
+}
+#boot-start {
+  font-size: clamp(26px, 5vw, 40px);
+  padding: 16px 44px;
+  background: linear-gradient(160deg, #06d6a0, #4d96ff);
+  color: #fff;
+}
+#boot-start::before { content: '▶ '; }
+#boot-continue {
+  font-size: clamp(16px, 3vw, 22px);
+  padding: 14px 26px;
+  background: var(--panel);
+  color: var(--ink);
+}
+#boot-start:active, #boot-continue:active { transform: scale(0.94); }
+
+/* ============================================================
+   SMALL SCREENS — keep everything reachable
+   ============================================================ */
+@media (max-height: 560px) {
+  .kid-hint, .kid-bubble { bottom: 200px; }
+}
+@media (max-width: 720px) {
+  .kid-tool-lbl { display: none; }
+  .kid-logo { font-size: 20px; }
+}

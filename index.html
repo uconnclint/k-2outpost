@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Space Builders</title>
+  <link rel="stylesheet" href="/src/ui/style.css" />
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="ui-root"></div>
+  <div id="boot-screen">
+    <img id="boot-moon" alt="" />
+    <div class="boot-inner">
+      <div class="boot-logo">
+        <img class="boot-logo-rocket" id="boot-rocket" alt="" />
+        SPACE<span>BUILDERS</span>
+      </div>
+      <div class="boot-sub">Build your own space city on the Moon!</div>
+      <div class="boot-bar"><div id="boot-progress"></div></div>
+      <div class="boot-btns">
+        <button id="boot-start" class="hidden">PLAY</button>
+        <button id="boot-continue" class="hidden">Keep Building</button>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
