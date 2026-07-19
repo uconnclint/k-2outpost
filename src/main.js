@@ -21,6 +21,7 @@ import { Effects } from './world/effects.js';
 import { BUILDINGS_BY_ID } from './core/catalog.js';
 import { initUI } from './ui/ui.js';
 import { audio } from './core/audio.js';
+import { voice } from './core/voice.js';
 import bootMoonUrl from './assets/icons/world-moon.png?url';
 import bootRocketUrl from './assets/icons/victory-rocket.png?url';
 
@@ -100,6 +101,7 @@ function startGame(fresh) {
   bootScreen.classList.add('fade-out');
   setTimeout(() => bootScreen.remove(), 900);
   audio.init();
+  voice.say('welcome');
   running = true;
 }
 
@@ -126,6 +128,7 @@ function launchRocket() {
     effects.launchRocket(c.x + 6, c.z + 6);
   }
   audio.rocket();
+  voice.say('blastoff');
 }
 
 // ---------------- UI ----------------
@@ -142,6 +145,7 @@ events.on('placed', (b) => {
   const y = terrainHeight(c.x, c.z) + 1.2;
   effects.sparkle(c.x, y, c.z);
   audio.place();
+  voice.cheer();
   // when a home appears, welcome some friends with a supply pod
   if (def && def.homes) {
     const now = performance.now();
@@ -156,7 +160,10 @@ events.on('demolished', (b) => {
   const y = terrainHeight(c.x, c.z) + 1.0;
   effects.sparkle(c.x, y, c.z, { count: 8, spread: 1.6 });
   audio.erase();
+  voice.bye();
 });
+// clearing everything says "all clean!" (it cuts off the bye-byes above)
+events.on('cleared', () => voice.say('allclean'));
 
 // keep the walking-astronaut count in step with how many homes exist
 function syncFriends() {
@@ -216,7 +223,7 @@ requestAnimationFrame(frame);
 
 // dev hook
 window.__SB__ = {
-  state, events, place, canPlace, demolish, clearAll, launchRocket, scene, vehicles,
+  state, events, place, canPlace, demolish, clearAll, launchRocket, scene, vehicles, voice,
   // manually advance the world (used to verify motion in headless testing)
   step(n = 1, dt = 0.05) {
     for (let i = 0; i < n; i++) {

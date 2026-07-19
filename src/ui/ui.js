@@ -11,6 +11,7 @@
 import { state, events, demolish, buildingAt } from '../core/state.js';
 import { CATEGORIES, BUILDINGS, BUILDINGS_BY_ID } from '../core/catalog.js';
 import { audio } from '../core/audio.js';
+import { voice } from '../core/voice.js';
 
 function el(tag, cls, attrs) {
   const n = document.createElement(tag);
@@ -68,6 +69,7 @@ export function initUI({ placementTool, launchRocket, clearAll }) {
   soundBtn.addEventListener('click', () => {
     const on = !audio.enabled;
     audio.setEnabled(on);
+    voice.setEnabled(on);
     soundBtn.textContent = on ? '🔊' : '🔇';
     soundBtn.classList.toggle('off', !on);
   });
@@ -176,6 +178,7 @@ export function initUI({ placementTool, launchRocket, clearAll }) {
     tab.addEventListener('click', () => {
       activeCat = cat.id;
       audio.tap();
+      voice.say('cat-' + cat.id);
       renderCards();
       updateTabs();
     });
@@ -204,6 +207,7 @@ export function initUI({ placementTool, launchRocket, clearAll }) {
         } else {
           placementTool.setBuild(def.id);
           audio.tap();
+          voice.say('b-' + def.id);        // speak the building's name
         }
       });
       cardsRow.appendChild(card);
