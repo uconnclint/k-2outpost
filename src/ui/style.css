@@ -496,6 +496,27 @@ html, body {
 }
 #boot-start:active, #boot-continue:active { transform: scale(0.94); }
 
+/* quiet teacher link — findable by a grown-up, easy for a kid to skip past */
+#boot-teacher {
+  display: inline-block;
+  margin-top: 34px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: #b9c4e4;
+  font-family: var(--font);
+  font-size: clamp(12px, 1.7vw, 14px);
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 150ms, background 150ms, border-color 150ms;
+}
+#boot-teacher:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
 /* ============================================================
    SMALL SCREENS — keep everything reachable
    ============================================================ */

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Grown-Ups' Corner — Space Builders Teacher Guide</title>
+<style>
+  :root{
+    --ink:#22263a; --ink-soft:#4c5270; --muted:#6f7690;
+    --accent:#3f7fe0; --accent-dark:#2a5fb0; --accent-soft:#eaf1fd;
+    --gold:#f0a92b; --gold-soft:#fdf3e0;
+    --green:#12a06b; --green-soft:#e6f7f0;
+    --line:#e2e6f0; --card:#ffffff; --bg:#f7f8fc;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    font-size:16px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:940px;margin:0 auto;padding:32px 22px 72px}
+
+  /* ---------- header ---------- */
+  header.hero{
+    background:linear-gradient(135deg,#33509b,#20284a);
+    color:#fff; border-radius:22px; padding:34px 32px; margin-bottom:26px;
+  }
+  .hero h1{margin:0 0 6px;font-size:30px;line-height:1.2;letter-spacing:.2px}
+  .hero .sub{margin:0;color:#c8d4f2;font-size:17px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .chip{
+    background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.28);
+    color:#fff; border-radius:999px; padding:5px 13px; font-size:13px; font-weight:600;
+  }
+
+  /* ---------- structure ---------- */
+  section{margin:0 0 30px}
+  h2{
+    font-size:22px; margin:34px 0 14px; padding-bottom:9px;
+    border-bottom:3px solid var(--accent-soft); color:var(--accent-dark);
+  }
+  h2 .n{
+    display:inline-grid;place-items:center;width:28px;height:28px;margin-right:9px;
+    background:var(--accent); color:#fff; border-radius:9px;
+    font-size:15px; font-weight:700; vertical-align:-4px;
+  }
+  h3{font-size:17px;margin:20px 0 8px;color:var(--ink)}
+  p{margin:0 0 12px}
+  .lead{font-size:17px;color:var(--ink-soft)}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px 22px; margin:0 0 16px;
+  }
+  .tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:14px}
+  .tool{
+    background:var(--card); border:1px solid var(--line);
+    border-left:5px solid var(--accent); border-radius:13px; padding:15px 17px;
+  }
+  .tool h4{margin:0 0 5px;font-size:15.5px}
+  .tool p{margin:0;font-size:14.5px;color:var(--ink-soft)}
+
+  .note{
+    background:var(--gold-soft); border:1px solid #f0dcb4; border-left:5px solid var(--gold);
+    border-radius:13px; padding:15px 18px; margin:0 0 18px;
+  }
+  .note strong{color:#8a5d09}
+  .tip{
+    background:var(--green-soft); border:1px solid #bfe8d7; border-left:5px solid var(--green);
+    border-radius:13px; padding:15px 18px; margin:16px 0 0;
+  }
+
+  /* ---------- tables ---------- */
+  table{width:100%;border-collapse:collapse;margin:12px 0 8px;font-size:14.5px}
+  caption{
+    caption-side:top;text-align:left;font-weight:700;color:var(--ink);
+    padding:0 0 8px;font-size:15.5px;
+  }
+  th,td{border:1px solid var(--line);padding:10px 12px;vertical-align:top;text-align:left}
+  thead th{background:var(--accent-soft);color:var(--accent-dark);font-size:13.5px;letter-spacing:.3px}
+  tbody tr:nth-child(even){background:#fafbfe}
+  td.code{font-weight:700;color:var(--accent-dark);white-space:nowrap;font-size:13.5px}
+  .verbatim{color:var(--ink-soft);font-style:italic}
+
+  /* ---------- lessons ---------- */
+  .lesson{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin:0 0 20px;background:var(--card)}
+  .lesson-head{background:var(--accent-soft);padding:15px 20px;border-bottom:1px solid var(--line)}
+  .lesson-head h3{margin:0;color:var(--accent-dark);font-size:18px}
+  .lesson-head .meta{font-size:13px;color:var(--muted);font-weight:600;margin-top:3px}
+  .lesson-body{padding:18px 20px}
+  .lesson-body h4{margin:16px 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+  .lesson-body h4:first-child{margin-top:0}
+  ol,ul{margin:0 0 10px;padding-left:22px}
+  li{margin:0 0 7px}
+  .vocab{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 10px}
+  .vocab span{background:var(--accent-soft);color:var(--accent-dark);border-radius:8px;padding:4px 11px;font-size:13.5px;font-weight:600}
+  .qs{background:#fafbfe;border:1px dashed var(--line);border-radius:11px;padding:13px 16px;margin-top:6px}
+  .qs ul{margin:0;padding-left:20px}
+
+  /* ---------- starters + rubric ---------- */
+  .starters{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:13px}
+  .starter{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 17px;font-size:15px}
+  .starter b{display:block;color:var(--accent-dark);font-size:13px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+  .lv{font-weight:700;white-space:nowrap}
+  .lv1{color:#b9791a}.lv2{color:var(--accent-dark)}.lv3{color:var(--green)}
+
+  footer{margin-top:38px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13.5px}
+  a{color:var(--accent-dark)}
+
+  /* ---------- print ---------- */
+  @media print{
+    body{background:#fff;font-size:11.5pt}
+    .wrap{max-width:100%;padding:0}
+    header.hero{background:#fff!important;color:#000;border:2px solid #333;border-radius:0;padding:16px 0;margin-bottom:14px}
+    .hero .sub{color:#333}
+    .chip{background:#fff;border:1px solid #999;color:#000}
+    .card,.tool,.lesson,.starter,.note,.tip,.qs{break-inside:avoid;page-break-inside:avoid}
+    .lesson,section{page-break-inside:auto}
+    h2{page-break-after:avoid}
+    tr,img{page-break-inside:avoid}
+    a{color:#000;text-decoration:underline}
+    a[href^="http"]::after{content:" (" attr(href) ")";font-size:9pt;color:#555}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>🍎 Grown-Ups' Corner</h1>
+  <p class="sub"><strong>Space Builders</strong> — a goal-free Moon-colony sandbox for young builders.</p>
+  <div class="chips">
+    <span class="chip">Grades K–2 (ages 5–8)</span>
+    <span class="chip">Engineering &amp; Computational Thinking</span>
+    <span class="chip">No reading required</span>
+    <span class="chip">20–30 min lessons</span>
+    <span class="chip">Works offline after loading</span>
+  </div>
+</header>
+
+<!-- ============ 1. OVERVIEW ============ -->
+<section>
+  <h2><span class="n">1</span>Overview</h2>
+  <p class="lead">
+    <strong>Space Builders</strong> is a sandbox: children build a city on the Moon by tapping a
+    picture and then tapping the ground. There is <strong>no score, no timer, no way to lose,
+    and nothing locked</strong>. Every one of the 41 buildings is available from the first second.
+    The learning happens in what children <em>choose</em> to build, how they arrange it, and how
+    they explain it — not in beating a level.
+  </p>
+  <p>
+    The game is deliberately built for pre-readers. A friendly narrator <strong>says the name
+    out loud</strong> of every category and every building the child taps, so a five-year-old who
+    cannot yet read "Greenhouse" still learns the word. All controls are large, touch-first
+    buttons designed for Chromebooks and iPads.
+  </p>
+
+  <h3>Every tool your student actually uses</h3>
+  <div class="tools">
+    <div class="tool">
+      <h4>🗂️ Category tabs (8)</h4>
+      <p>Homes, Power, Plants, Space, Fun, Machines, Science, and Roads. Tapping a tab speaks the
+      category name aloud and shows that group's buildings.</p>
+    </div>
+    <div class="tool">
+      <h4>🏠 Building cards (41)</h4>
+      <p>Each card shows a picture and a short name. Tapping a card speaks its name ("Dome House")
+      and picks it up; the child then taps the Moon to place it.</p>
+    </div>
+    <div class="tool">
+      <h4>🖐️ Move</h4>
+      <p>The default mode. Drag to pan across the Moon, pinch or scroll to zoom, and two-finger
+      twist or right-drag to orbit the camera around the colony.</p>
+    </div>
+    <div class="tool">
+      <h4>🔄 Turn</h4>
+      <p>Rotates the held building 90° before it is placed. It lights up only while a building is
+      selected, so children learn it belongs to the act of placing.</p>
+    </div>
+    <div class="tool">
+      <h4>🧽 Erase</h4>
+      <p>Removes a building with a sparkle and a "Bye bye!". Children can also simply tap any
+      placed building in Move mode to see its name and an erase button.</p>
+    </div>
+    <div class="tool">
+      <h4>🧹 Clear everything</h4>
+      <p>Wipes the whole colony, but only after a second confirming tap — a built-in "are you
+      sure?" that prevents accidental loss of work.</p>
+    </div>
+    <div class="tool">
+      <h4>✏️ Drag to draw</h4>
+      <p>Paths, Tubes, and Train Track can be <em>dragged</em> to paint a whole line at once,
+      instead of tapping each square.</p>
+    </div>
+    <div class="tool">
+      <h4>🚇 Tubes that connect</h4>
+      <p>Tubes and Train Track sense their neighbors and reshape themselves — straight runs,
+      corners, T-junctions, and 4-way crossings all join into one continuous network.</p>
+    </div>
+    <div class="tool">
+      <h4>🚝 Space Train &amp; Track</h4>
+      <p>Lay Train Track and a train rides whatever line the child builds, pulling into stations
+      and turning corners. A larger loop automatically runs more trains (up to four).</p>
+    </div>
+    <div class="tool">
+      <h4>👩‍🚀 Space friends</h4>
+      <p>Building homes causes little astronauts to move in and walk around the colony, and a
+      supply pod flies down to deliver them.</p>
+    </div>
+    <div class="tool">
+      <h4>🚙 Rover Garage</h4>
+      <p>Places a garage that sends out a rover, which drives along the Paths and Tubes the child
+      has laid down.</p>
+    </div>
+    <div class="tool">
+      <h4>🚀 BLAST OFF</h4>
+      <p>Launches a rocket with a spoken "Three! Two! One! Blast off!" countdown and a glittery
+      trail. It lifts from the child's Rocket Pad if they built one.</p>
+    </div>
+    <div class="tool">
+      <h4>⭐ Builder counter</h4>
+      <p>Counts everything the child has built. It only ever goes up as they create — it is
+      encouragement, never a score to beat.</p>
+    </div>
+    <div class="tool">
+      <h4>🔊 Sound toggle</h4>
+      <p>Turns the narrator voice and sound effects on or off — essential for a classroom of
+      shared devices or a sound-sensitive learner.</p>
+    </div>
+  </div>
+
+  <div class="tip">
+    <strong>Classroom note:</strong> the colony saves automatically. Children can close the tab and
+    press <em>Keep Building</em> next session to find their Moon base exactly as they left it —
+    which makes multi-day projects possible.
+  </div>
+</section>
+
+<!-- ============ 2. STANDARDS ============ -->
+<section>
+  <h2><span class="n">2</span>Standards Alignment</h2>
+
+  <div class="note">
+    <strong>About Connecticut science standards:</strong> Connecticut adopted the
+    <em>Next Generation Science Standards</em> (NGSS) as its state science standards in 2015.
+    The science codes below are therefore <strong>both the Connecticut science standards and the
+    national standards</strong> — no separate crosswalk is needed. Computer science codes come from
+    the CSTA K–12 Computer Science Standards, the national CS framework (Level 1A = grades K–2).
+  </div>
+
+  <table>
+    <caption>Science — NGSS / Connecticut Science Standards (K–2)</caption>
+    <thead>
+      <tr><th style="width:15%">Code</th><th style="width:42%">Performance Expectation</th><th>How this game addresses it</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="code">K-ESS3-1</td>
+        <td class="verbatim">Use a model to represent the relationship between the needs of different plants or animals (including humans) and the places they live.</td>
+        <td>The colony <em>is</em> the model. To support space friends, children place Dome Houses (shelter), Air Maker and Air Tank (air), Water Tank (water), and Greenhouse or Veggie Farm (food). Astronauts only move in once homes exist, making the needs-to-place relationship visible.</td>
+      </tr>
+      <tr>
+        <td class="code">K-2-ETS1-1</td>
+        <td class="verbatim">Ask questions, make observations, and gather information about a situation people want to change to define a simple problem that can be solved through the development of a new or improved object or tool.</td>
+        <td>Children define a real problem before building — "our astronauts can't get from the houses to the lab" — then choose Paths, Tubes, or Train Track to solve it. Lesson 2 runs this cycle explicitly.</td>
+      </tr>
+      <tr>
+        <td class="code">K-2-ETS1-2</td>
+        <td class="verbatim">Develop a simple sketch, drawing, or physical model to illustrate how the shape of an object helps it function as needed to solve a given problem.</td>
+        <td>Children sketch a colony plan, then build it. Shape genuinely drives function here: Tubes must physically touch to form a connected corridor, and Train Track must form an unbroken line or the train cannot travel it.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <table>
+    <caption>Computer Science — CSTA K–12 Standards, Level 1A (Grades K–2)</caption>
+    <thead>
+      <tr><th style="width:15%">Code</th><th style="width:42%">Standard</th><th>How this game addresses it</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="code">1A-CS-01</td>
+        <td class="verbatim">Select and operate appropriate software to perform a variety of tasks, and recognize that users have different needs and preferences for the technology they use.</td>
+        <td>Children choose the right tool for each task — Move to look, Turn to rotate, Erase to remove. The spoken-name narration and the 🔊 toggle are a concrete, discussable example of software meeting different user needs (a pre-reader vs. a child who needs quiet).</td>
+      </tr>
+      <tr>
+        <td class="code">1A-AP-08</td>
+        <td class="verbatim">Model daily processes by creating and following algorithms (sets of step-by-step instructions) to complete tasks.</td>
+        <td>In Lesson 3, children write a numbered "build recipe" and a partner follows it move-for-move in the game. Building is inherently sequential: pick a tab, pick a card, aim, tap.</td>
+      </tr>
+      <tr>
+        <td class="code">1A-AP-11</td>
+        <td class="verbatim">Decompose (break down) the steps needed to solve a problem into a precise sequence of instructions.</td>
+        <td>"Build a Moon base" is too big to do at once. Children break it into parts — homes first, then air and water, then the paths that join them — and place each piece in order.</td>
+      </tr>
+      <tr>
+        <td class="code">1A-AP-12</td>
+        <td class="verbatim">Develop plans that describe a program's sequence of events, goals, and expected outcomes.</td>
+        <td>The sketch-before-you-build step in every lesson is exactly this plan: what I will build, in what order, and what it should look like when finished.</td>
+      </tr>
+      <tr>
+        <td class="code">1A-AP-14</td>
+        <td class="verbatim">Debug (identify and fix) errors in an algorithm or program that includes sequences and simple loops.</td>
+        <td>The game gives honest, immediate feedback for debugging. If Train Track has a gap, the train will not cross it; if a Tube is one square short, the corridor does not join. Children hunt for the break and repair it with Erase and re-placement.</td>
+      </tr>
+      <tr>
+        <td class="code">1A-AP-15</td>
+        <td class="verbatim">Using correct terminology, describe steps taken and choices made during the iterative process of program development.</td>
+        <td>The conversation starters in Section 4 ask children to narrate their build using real tool names — "I used Turn so the door faced the Path" — which is precisely this practice.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Extending to Grades 3–5</h3>
+  <p>Older students can play the same sandbox with a harder brief (a fixed footprint, a required
+  loop, or a partner's blueprint). These codes then apply:</p>
+  <table>
+    <thead>
+      <tr><th style="width:15%">Code</th><th style="width:42%">Standard</th><th>How to reach it</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="code">3-5-ETS1-1</td>
+        <td class="verbatim">Define a simple design problem reflecting a need or a want that includes specified criteria for success and constraints on materials, time, or cost.</td>
+        <td>Give constraints the sandbox does not impose: "exactly 12 buildings, every home reachable by Tube, finished in 20 minutes."</td>
+      </tr>
+      <tr>
+        <td class="code">3-5-ETS1-2</td>
+        <td class="verbatim">Generate and compare multiple possible solutions to a problem based on how well each is likely to meet the criteria and constraints of the problem.</td>
+        <td>Two students build competing Train Track layouts for the same stations, then compare which carries trains more directly and uses fewer track pieces.</td>
+      </tr>
+      <tr>
+        <td class="code">1B-AP-11</td>
+        <td class="verbatim">Decompose (break down) problems into smaller, manageable subproblems to facilitate the program development process.</td>
+        <td>Students split the colony into zones — housing, power, transit — assign each to a teammate, then merge the results into one base.</td>
+      </tr>
+      <tr>
+        <td class="code">1B-AP-15</td>
+        <td class="verbatim">Test and debug (identify and fix errors) a program or algorithm to ensure it runs as intended.</td>
+        <td>Students deliberately build a broken track loop, trade devices, and race to find and repair the other team's gap.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p style="font-size:14px;color:var(--muted);margin-top:14px">
+    Standards references:
+    <a href="https://portal.ct.gov/sde" target="_blank" rel="noopener">Connecticut State Department of Education</a> ·
+    <a href="https://www.nextgenscience.org/" target="_blank" rel="noopener">NGSS (nextgenscience.org)</a> ·
+    <a href="https://csteachers.org/k12standards/" target="_blank" rel="noopener">CSTA K–12 CS Standards</a>
+  </p>
+</section>
+
+<!-- ============ 3. LESSONS ============ -->
+<section>
+  <h2><span class="n">3</span>Three Ready-to-Run Lessons</h2>
+
+  <!-- LESSON 1 -->
+  <div class="lesson">
+    <div class="lesson-head">
+      <h3>Lesson 1 — What Does a Space Friend Need?</h3>
+      <div class="meta">Kindergarten · 20–25 minutes · K-ESS3-1, K-2-ETS1-1</div>
+    </div>
+    <div class="lesson-body">
+      <h4>Objective</h4>
+      <p>Students will identify the basic needs of people and build a Moon colony that provides
+      each need, explaining which building meets which need.</p>
+
+      <h4>Vocabulary</h4>
+      <div class="vocab"><span>need</span><span>shelter</span><span>air</span><span>water</span><span>food</span><span>colony</span><span>model</span></div>
+
+      <h4>Steps</h4>
+      <ol>
+        <li><strong>(4 min) Ask first.</strong> "If you moved to the Moon tomorrow, what would you
+        need to stay alive?" Chart their answers. Steer toward four: air, water, food, shelter.</li>
+        <li><strong>(2 min) Open the game.</strong> Press <em>PLAY</em>. Point out the ⭐ counter and
+        that the Rocket Home is already there with one space friend.</li>
+        <li><strong>(4 min) Shelter.</strong> Tap the <em>Homes</em> tab — listen to the narrator say
+        "Homes." Place two or three <em>Dome Houses</em>. Watch more astronauts arrive and walk
+        around. Ask: "Why did more friends show up?"</li>
+        <li><strong>(4 min) Air and water.</strong> Tap the <em>Plants</em> tab. Place an
+        <em>Air Maker</em>, an <em>Air Tank</em>, and a <em>Water Tank</em>. Have students say the
+        need out loud as they place each one.</li>
+        <li><strong>(4 min) Food.</strong> Still in <em>Plants</em>, place a <em>Greenhouse</em> or a
+        <em>Veggie Farm</em>. Zoom in with <em>Move</em> to see the little trees growing inside.</li>
+        <li><strong>(4 min) Check the model.</strong> Go down the class chart. For each need, a
+        student points at the building that provides it and names it.</li>
+        <li><strong>(2 min) Park it.</strong> Remind students the colony saves itself — tomorrow they
+        press <em>Keep Building</em>.</li>
+      </ol>
+
+      <h4>Discussion</h4>
+      <div class="qs">
+        <ul>
+          <li>Which need would be the very hardest to bring to the Moon, and why?</li>
+          <li>Our astronauts only moved in after we built homes. What does that tell us about what living things need?</li>
+          <li>What do <em>you</em> need at home that our Moon colony doesn't have yet?</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- LESSON 2 -->
+  <div class="lesson">
+    <div class="lesson-head">
+      <h3>Lesson 2 — Connect the Colony (and Fix the Break)</h3>
+      <div class="meta">Grade 1 · 25–30 minutes · K-2-ETS1-1, K-2-ETS1-2, 1A-AP-14</div>
+    </div>
+    <div class="lesson-body">
+      <h4>Objective</h4>
+      <p>Students will connect separated buildings with a continuous Tube network, then find and
+      repair a deliberate gap — an authentic first experience of debugging.</p>
+
+      <h4>Vocabulary</h4>
+      <div class="vocab"><span>connect</span><span>network</span><span>path</span><span>gap</span><span>debug</span><span>corner</span><span>test</span></div>
+
+      <h4>Steps</h4>
+      <ol>
+        <li><strong>(4 min) Make the problem.</strong> Place two <em>Dome Houses</em> far apart, and a
+        <em>Lab</em> across the map. Ask: "How does a space friend get from here to there without
+        air?" Name the problem together.</li>
+        <li><strong>(5 min) Draw a road.</strong> Tap the <em>Roads</em> tab and choose <em>Tube</em>.
+        Show that you can <strong>hold and drag</strong> to paint a whole line at once instead of
+        tapping every square.</li>
+        <li><strong>(5 min) Turn a corner.</strong> Drag a second Tube line that meets the first at a
+        right angle. Zoom in with <em>Move</em>: the tubes have reshaped themselves into a corner.
+        Ask students what would happen if the pieces did not touch.</li>
+        <li><strong>(6 min) Break it on purpose.</strong> Teacher (or a partner) uses <em>Erase</em>
+        to secretly remove <strong>one</strong> Tube from the middle of the line. Students hunt for the
+        gap, then repair it by placing a Tube back. Name what they did: <em>debugging</em>.</li>
+        <li><strong>(6 min) Partner challenge.</strong> Partners take turns removing one piece while
+        the other looks away, then racing to find and fix it.</li>
+        <li><strong>(3 min) Share.</strong> Two students show their network and trace the route from
+        a house to the Lab with a finger.</li>
+      </ol>
+
+      <h4>Discussion</h4>
+      <div class="qs">
+        <ul>
+          <li>How did you know exactly where the gap was?</li>
+          <li>A "bug" is a mistake that stops something from working. What was our bug, and how did we fix it?</li>
+          <li>Where else in real life do things have to connect all the way to work — roads, water pipes, hand-holding chains?</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- LESSON 3 -->
+  <div class="lesson">
+    <div class="lesson-head">
+      <h3>Lesson 3 — Build Recipes (Algorithms You Can Follow)</h3>
+      <div class="meta">Grade 2 · 25–30 minutes · 1A-AP-08, 1A-AP-11, 1A-AP-12, 1A-AP-15</div>
+    </div>
+    <div class="lesson-body">
+      <h4>Objective</h4>
+      <p>Students will write a precise, numbered set of build instructions and test it by having a
+      partner follow it exactly, then revise any step that was too vague.</p>
+
+      <h4>Vocabulary</h4>
+      <div class="vocab"><span>algorithm</span><span>step-by-step</span><span>precise</span><span>order</span><span>plan</span><span>revise</span></div>
+
+      <h4>Steps</h4>
+      <ol>
+        <li><strong>(4 min) Model a bad recipe.</strong> Say only "build a base" and let a volunteer
+        try. Then ask why the result did not match what you pictured. Introduce
+        <em>algorithm</em>: instructions so exact that anyone gets the same result.</li>
+        <li><strong>(6 min) Write the recipe.</strong> On paper, each student writes 5–6 numbered
+        steps for a small base. Require the real tool names, e.g. "1. Tap the <em>Homes</em> tab.
+        2. Tap <em>Dome House</em>. 3. Place it in the middle. 4. Tap <em>Turn</em> once."</li>
+        <li><strong>(8 min) Swap and run.</strong> Partners trade papers and follow the other's recipe
+        <strong>exactly</strong> — no guessing allowed. Encourage a friendly "I can't tell what to do
+        here" when a step is fuzzy.</li>
+        <li><strong>(5 min) Debug the recipe.</strong> Authors fix every step their partner stumbled
+        on. Point out that they just <em>debugged instructions</em>, not buildings.</li>
+        <li><strong>(4 min) Compare.</strong> Put the two colonies side by side. How close are they?
+        The closer they match, the more precise the algorithm was.</li>
+        <li><strong>(3 min) Celebrate.</strong> Press <em>BLAST OFF</em> together and listen to the
+        countdown.</li>
+      </ol>
+
+      <h4>Discussion</h4>
+      <div class="qs">
+        <ul>
+          <li>Which step tripped your partner up? How did you make it clearer?</li>
+          <li>Does the <em>order</em> of the steps matter? What breaks if you place a Tube before the buildings it should connect?</li>
+          <li>Where else do we follow step-by-step instructions — recipes, fire drills, brushing teeth?</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. CONVERSATION STARTERS ============ -->
+<section>
+  <h2><span class="n">4</span>Conversation Starters</h2>
+  <p class="lead">Because there is no score, the thinking lives in the child's explanation. These
+  questions pull it out. Ask them while the colony is on screen so the child can point.</p>
+  <div class="starters">
+    <div class="starter"><b>Give me a tour</b>Walk me through your colony. What is this one called, and why did you put it right there?</div>
+    <div class="starter"><b>Purpose</b>Who lives in your base, and what do they need every single day to be okay?</div>
+    <div class="starter"><b>Design choice</b>You put these two buildings next to each other. Was that on purpose? What made you decide?</div>
+    <div class="starter"><b>Debugging</b>Did anything not work the way you expected? How did you figure out the fix?</div>
+    <div class="starter"><b>Sequencing</b>What did you build first? If you started over, would you build it in the same order?</div>
+    <div class="starter"><b>Systems</b>Follow your Tube with your finger. Can a space friend get everywhere from here, or is somewhere cut off?</div>
+    <div class="starter"><b>Iteration</b>If you had ten more minutes, what is the very next thing you would add or change?</div>
+    <div class="starter"><b>Transfer</b>What is one thing your Moon colony has that our town also has? What does our town have that yours is missing?</div>
+    <div class="starter"><b>Vocabulary</b>The game said the name out loud when you tapped it. Which building has the most interesting name, and what do you think it does?</div>
+  </div>
+</section>
+
+<!-- ============ 5. RUBRIC ============ -->
+<section>
+  <h2><span class="n">5</span>Capstone &amp; Rubric</h2>
+  <div class="card">
+    <h3 style="margin-top:0">Capstone task: "Make Your Own Moon Base"</h3>
+    <p style="margin-bottom:0">Give students 20–25 minutes to build a colony that <strong>(a)</strong>
+    meets all four survival needs, <strong>(b)</strong> connects its buildings with Paths, Tubes, or
+    Train Track, and <strong>(c)</strong> can be explained out loud in a one-minute tour. Assess by
+    listening to the tour, not by counting buildings.</p>
+  </div>
+
+  <table>
+    <caption>Three-level assessment rubric</caption>
+    <thead>
+      <tr>
+        <th style="width:20%">Criterion</th>
+        <th style="width:26%"><span class="lv lv1">1 — Getting Started</span></th>
+        <th style="width:27%"><span class="lv lv2">2 — Building It</span></th>
+        <th style="width:27%"><span class="lv lv3">3 — Space Architect</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Meeting needs</strong><br><span style="font-size:12.5px;color:var(--muted)">K-ESS3-1</span></td>
+        <td>Places buildings freely; needs are not yet considered.</td>
+        <td>Provides shelter plus one or two other needs (air, water, or food).</td>
+        <td>Provides all four needs and names the building that supplies each one.</td>
+      </tr>
+      <tr>
+        <td><strong>Connecting</strong><br><span style="font-size:12.5px;color:var(--muted)">K-2-ETS1-2</span></td>
+        <td>Buildings sit apart with no Paths or Tubes between them.</td>
+        <td>Draws some Paths or Tubes, though parts of the base remain unreachable.</td>
+        <td>Builds a continuous network reaching every area; corners and junctions join cleanly.</td>
+      </tr>
+      <tr>
+        <td><strong>Planning &amp; order</strong><br><span style="font-size:12.5px;color:var(--muted)">1A-AP-11, 1A-AP-12</span></td>
+        <td>Builds by trial and error with no stated plan.</td>
+        <td>Describes a rough plan and mostly follows it.</td>
+        <td>States a plan first, builds in a sensible order, and explains why that order helped.</td>
+      </tr>
+      <tr>
+        <td><strong>Fixing problems</strong><br><span style="font-size:12.5px;color:var(--muted)">1A-AP-14</span></td>
+        <td>Needs adult help to notice something is not working.</td>
+        <td>Notices a problem, such as a gap, and fixes it with prompting.</td>
+        <td>Independently spots the break, repairs it with Erase, and explains the fix.</td>
+      </tr>
+      <tr>
+        <td><strong>Explaining</strong><br><span style="font-size:12.5px;color:var(--muted)">1A-AP-15</span></td>
+        <td>Points at buildings; uses few names.</td>
+        <td>Names most buildings and gives simple reasons for placement.</td>
+        <td>Gives a clear tour using correct tool and building names, and justifies design choices.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="tip">
+    <strong>Keep it low-stakes.</strong> This game has no fail state by design. Use the rubric to
+    notice growth and guide your questions — not to grade a child's creativity.
+  </div>
+</section>
+
+<footer>
+  <p><strong>Space Builders</strong> — Grown-Ups' Corner. Grades K–2. Built for Chromebooks, iPads,
+  and any modern browser; no account, no data collection, and no internet needed once the page has
+  loaded.</p>
+  <p>This page is self-contained and prints cleanly — use your browser's Print command to make
+  paper copies for a planning binder or a substitute folder.</p>
+</footer>
+
+</div>
+</body>
+</html>
