@@ -4,7 +4,14 @@
 // pre-readers hear the category and building names out loud.
 // Clips live in src/assets/voice/<key>.mp3; missing keys are
 // simply silent, so the game still runs before they're made.
+//
+// `enabled` mirrors ctx.settings' `muted` flag exactly like core/audio.js
+// (see that file's header for the reasoning) — CE.settings.onChange is
+// the single source of truth both engines react to, so a tap on the one
+// sound button (src/ui/ui.js) keeps SFX and voice in lockstep.
 // ============================================================
+
+import { CE } from '../engine-bridge.js';
 
 const VOICE_URLS = import.meta.glob('../assets/voice/*.mp3', { eager: true, query: '?url', import: 'default' });
 function clipUrl(key) {
@@ -16,11 +23,20 @@ const YAYS = ['yay-1', 'yay-2', 'yay-3', 'yay-4', 'yay-5'];
 
 class Voice {
   constructor() {
-    this.enabled = true;
+    this.enabled = !CE.settings.get('muted');
     this.cache = new Map();     // key -> HTMLAudioElement (or null if no clip)
     this.current = null;
     this._lastYay = 0;
     this._lastBye = 0;
+    CE.settings.onChange((key, value) => { if (key === 'muted') this._applyMuted(!!value); });
+  }
+
+  // Applies a mute/unmute that's ALREADY landed in CE.settings (called
+  // from the onChange listener above) — never call this directly, call
+  // setEnabled() so the choice actually persists.
+  _applyMuted(muted) {
+    this.enabled = !muted;
+    if (muted && this.current) { try { this.current.pause(); } catch { /* ignore */ } }
   }
 
   _audio(key) {
@@ -61,8 +77,7 @@ class Voice {
   }
 
   setEnabled(on) {
-    this.enabled = on;
-    if (!on && this.current) { try { this.current.pause(); } catch { /* ignore */ } }
+    CE.settings.set('muted', !on);
   }
 }
 

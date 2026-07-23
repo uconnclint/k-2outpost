@@ -3,7 +3,22 @@
 // 100% WebAudio, no assets. Cheerful little blips for placing and
 // erasing, a rocket whoosh, and a soft twinkly background so the
 // moon never feels lonely. One big mute button controls it all.
+//
+// `enabled` mirrors ctx.settings' `muted` flag (CE.settings, see
+// ../engine-bridge.js) — single source of truth, fresh players start
+// muted (Q11). setEnabled() only ever WRITES to CE.settings; the
+// onChange listener below is what actually ramps the gain node, mirroring
+// the exact idiom engine/core/audio.js uses internally for its own
+// settings.onChange('muted')-drives-the-gain-node wiring (see that file)
+// — Space Builders keeps this bespoke pentatonic synth rather than
+// adopting core/audio.js wholesale, but borrows its reactive pattern by
+// hand so core/voice.js's independent onChange subscription (next to
+// this file) and any future settings UI all stay in lockstep with a
+// single flip, not just whichever of setEnabled()'s two call sites
+// happens to run first (see src/ui/ui.js's soundBtn handler).
 // ============================================================
+
+import { CE } from '../engine-bridge.js';
 
 const PENTA = [0, 2, 4, 7, 9];   // major pentatonic — always sounds happy
 
@@ -12,9 +27,10 @@ class Audio {
     this.ctx = null;
     this.master = null;
     this.musicGain = null;
-    this.enabled = true;
+    this.enabled = !CE.settings.get('muted');
     this._twinkleTimer = 0;
     this._started = false;
+    CE.settings.onChange((key, value) => { if (key === 'muted') this._applyMuted(!!value); });
   }
 
   init() {
@@ -38,14 +54,22 @@ class Audio {
     try { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); } catch { /* ignore */ }
   }
 
-  setEnabled(on) {
-    this.enabled = on;
+  // Applies a mute/unmute that's ALREADY landed in CE.settings (called
+  // from the onChange listener registered in the constructor) — never
+  // call this directly to change mute, call setEnabled() so the choice
+  // actually persists.
+  _applyMuted(muted) {
+    this.enabled = !muted;
     if (this.master) {
       const now = this.ctx.currentTime;
       this.master.gain.cancelScheduledValues(now);
-      this.master.gain.linearRampToValueAtTime(on ? 0.9 : 0, now + 0.15);
+      this.master.gain.linearRampToValueAtTime(this.enabled ? 0.9 : 0, now + 0.15);
     }
-    if (on) this._resume();
+    if (this.enabled) this._resume();
+  }
+
+  setEnabled(on) {
+    CE.settings.set('muted', !on);
   }
 
   // ---- one note: freq (Hz), start offset, length, type, volume ----

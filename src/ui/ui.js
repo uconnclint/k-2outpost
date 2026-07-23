@@ -65,13 +65,20 @@ export function initUI({ placementTool, launchRocket, clearAll }) {
   // ===========================================================
   const actions = el('div', 'kid-actions');
   const soundBtn = el('button', 'kid-round', { 'aria-label': 'Sound on or off' });
-  soundBtn.textContent = '🔊';
+  // Icon starts from audio.enabled (now backed by ctx.settings — see
+  // core/audio.js), not a hardcoded 🔊: fresh players start MUTED (Q11),
+  // so a hardcoded speaker-on icon would lie to a kid about a game that's
+  // actually silent until they tap it once.
+  function syncSoundBtn(on) {
+    soundBtn.textContent = on ? '🔊' : '🔇';
+    soundBtn.classList.toggle('off', !on);
+  }
+  syncSoundBtn(audio.enabled);
   soundBtn.addEventListener('click', () => {
     const on = !audio.enabled;
     audio.setEnabled(on);
     voice.setEnabled(on);
-    soundBtn.textContent = on ? '🔊' : '🔇';
-    soundBtn.classList.toggle('off', !on);
+    syncSoundBtn(on);
   });
   const clearBtn = el('button', 'kid-round kid-clear', { 'aria-label': 'Clear everything' });
   clearBtn.textContent = '🧹';
