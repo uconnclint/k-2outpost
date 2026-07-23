@@ -101,6 +101,11 @@ function startGame(fresh) {
   bootScreen.classList.add('fade-out');
   setTimeout(() => bootScreen.remove(), 900);
   audio.init();
+  // Unlocks BOTH the clip <audio> path and ctx.speech's SpeechSynthesis
+  // fallback for iOS/Safari, inside this real user gesture (the PLAY/Keep
+  // Building tap) — see voice.js's unlock() for why the TTS fallback
+  // specifically needs this even though the old clip-only code never did.
+  voice.unlock();
   voice.say('welcome');
   running = true;
 }

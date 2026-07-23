@@ -185,7 +185,7 @@ export function initUI({ placementTool, launchRocket, clearAll }) {
     tab.addEventListener('click', () => {
       activeCat = cat.id;
       audio.tap();
-      voice.say('cat-' + cat.id);
+      voice.say('cat-' + cat.id, cat.name); // cat.name is the TTS fallback if the clip is missing/fails
       renderCards();
       updateTabs();
     });
@@ -214,7 +214,7 @@ export function initUI({ placementTool, launchRocket, clearAll }) {
         } else {
           placementTool.setBuild(def.id);
           audio.tap();
-          voice.say('b-' + def.id);        // speak the building's name
+          voice.say('b-' + def.id, def.name); // def.name is the TTS fallback if the clip is missing/fails
         }
       });
       cardsRow.appendChild(card);
