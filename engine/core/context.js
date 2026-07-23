@@ -8,16 +8,10 @@
 // SAME `settings`/`save` instance, so a game can't wire two different
 // settings objects and get inconsistent muting.
 //
-// audio.js/speech.js/feedback.js are loaded with a dynamic import — never a
-// static one — specifically so this file (and anything that imports it) can
-// never fail to load just because a sibling module doesn't exist yet, is
-// mid-edit, or fails to parse (rule: import must never throw in node). Real
-// games always get the real modules — this resolves once, via top-level
-// await, before createGameContext is ever called, so the function itself
-// stays a plain synchronous factory. A caller (in practice, only this
-// module's own test) may override some/all of them with `_factories` —
-// TEST-ONLY, not part of the public contract, and never required in a
-// real game.
+// audio.js/speech.js/feedback.js are statically imported (v0.2.0 — see the
+// note at the import site). A caller (in practice, only this module's own
+// test) may override some/all of them with `_factories` — TEST-ONLY, not
+// part of the public contract, and never required in a real game.
 
 import { createSave } from './save.js';
 import { createSettings } from './settings.js';
@@ -25,27 +19,16 @@ import { createProgress } from './progress.js';
 import { createEmitter } from './events.js';
 import { mulberry32, seedFromString, pick, shuffle, randInt } from './random.js';
 
-let _siblingFactories = null;
-try {
-  const [audioMod, speechMod, feedbackMod] = await Promise.all([
-    import('./audio.js'),
-    import('./speech.js'),
-    import('./feedback.js'),
-  ]);
-  if (audioMod.createAudio && speechMod.createSpeech && feedbackMod.createFeedback) {
-    _siblingFactories = {
-      createAudio: audioMod.createAudio,
-      createSpeech: speechMod.createSpeech,
-      createFeedback: feedbackMod.createFeedback,
-    };
-  }
-} catch {
-  // Not present yet (or one of them failed to load) — createGameContext()
-  // falls back to the safe no-op stand-ins below unless a caller supplies
-  // `_factories`. This must never throw: importing context.js has to work
-  // even mid-build, before audio/speech/feedback exist on disk.
-  _siblingFactories = null;
-}
+// v0.2.0: STATIC imports. The original top-level-await dynamic-import hedge
+// existed so this file could load before audio/speech/feedback were written;
+// all three now exist, are node-safe, and are covered by the test suite — and
+// the top-level await broke Vite's default esbuild target in every Vite game
+// (found in the clintsgolf migration). `_factories` remains the test seam.
+import { createAudio } from './audio.js';
+import { createSpeech } from './speech.js';
+import { createFeedback } from './feedback.js';
+
+const _siblingFactories = { createAudio, createSpeech, createFeedback };
 
 // Last-resort stand-ins so ctx.audio/speech/feedback are ALWAYS call-safe,
 // even in the pathological case where the real modules never showed up.
@@ -64,7 +47,9 @@ const NOOP_FACTORIES = {
  * @param {object} options
  * @param {string} options.gameId  required, kebab-case
  * @param {number} [options.saveVersion=1]
- * @param {object} [options.saveDefaults={}]
+ * @param {object} [options.saveDefaults={}]  top-level `progress` is RESERVED
+ *   if options.progress is set — createProgress() claims save.get().progress
+ *   at construction (netrunner renamed its own key to `run` over this)
  * @param {string[]} [options.legacySaveKeys]
  * @param {(data:*, fromKey:string) => object} [options.saveMigrate]
  * @param {number} [options.saveSlots]
@@ -77,7 +62,9 @@ const NOOP_FACTORIES = {
  * @param {object} [options.files]  audio asset-first config (see audio.js)
  * @param {object} [options.speech]  speech config: sources/ttsFallback/etc (see speech.js)
  * @param {object} [options.feedback]  feedback config: sink/etc (see feedback.js)
- * @param {object} [options.progress]  { xpPerLevel, badges, maxAwardsPerSession } (see progress.js)
+ * @param {object} [options.progress]  { xpPerLevel, badges, maxAwardsPerSession } (see progress.js);
+ *   OPT-IN — omit and ctx.progress is null; enabling it reserves the save
+ *   blob's top-level `progress` key for the engine
  * @param {Storage} [options.storage]  shared storage override for save+settings (tests)
  * @param {string|number} [options.randomSeed]  seeds ctx.random; default varies per load
  * @param {object} [options._factories]  TEST-ONLY override for
