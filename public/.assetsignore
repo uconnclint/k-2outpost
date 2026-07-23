@@ -1,0 +1,27 @@
+# .assetsignore — Cloudflare Workers static-assets ignore list (gitignore-
+# style syntax). Lives here under public/, NOT at the repo root, because
+# Cloudflare only reads `.assetsignore` from INSIDE the configured [assets]
+# directory (wrangler.toml points at ./dist, a Vite build output) — same
+# constraint netrunner/mail's migrations verified against Cloudflare's
+# docs. Vite copies everything under public/ verbatim into dist/, so this
+# file lands at dist/.assetsignore on every `npm run build`.
+#
+# In practice a real `npm run build` (verified during this migration)
+# already produces a clean dist/ — no node_modules/.git/docs/source files
+# end up there regardless of this list (Vite's build step is the actual
+# filter; every game asset is a real ES import, not a copied directory).
+# Kept anyway for consistency with the portfolio's canonical set
+# (clint-engine/templates/assetsignore) and as a backstop against stray
+# .DS_Store files under public/ getting copied verbatim.
+
+**/.wrangler
+**/node_modules
+**/.git
+**/.DS_Store
+**/.env
+.claude
+*.zip
+*.md
+wrangler.toml
+.assetsignore
+docs/

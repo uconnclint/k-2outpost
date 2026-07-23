@@ -18,6 +18,22 @@ npm run build      # static build in dist/ — host anywhere
 Runs in any modern browser. Designed for Chromebooks and iPads:
 touch-first, big tap targets, capped pixel ratio, zero textures.
 
+## Cloudflare Workers deployment
+
+Space Builders deploys as a Cloudflare Workers static-assets site.
+
+1. Run `npm install`.
+2. Run `npm run build`. Vite outputs `dist/`, and `public/_headers` +
+   `public/.assetsignore` ride along into `dist/` (Vite copies everything
+   under `public/` verbatim).
+3. Preview the build first: `npx wrangler versions upload` (production
+   stays untouched until the preview passes a device playtest).
+4. Deploy: `npx wrangler deploy`.
+
+Local check before deploying: `npx wrangler dev --port 8808` serves the
+built `dist/` exactly as Cloudflare would (confirm `npm run build` has
+already produced a current `dist/`).
+
 ## For little builders
 
 - **Tap a picture, then tap the Moon.** Build as many as you want, anywhere.

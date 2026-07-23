@@ -1,0 +1,36 @@
+# _headers — Cloudflare Workers static-assets response headers. Lives here
+# under public/, NOT at the repo root, because Cloudflare only reads
+# `_headers` from INSIDE the configured [assets] directory (wrangler.toml
+# points at ./dist, a Vite build output) — same constraint netrunner/mail's
+# migrations verified against Cloudflare's docs. Vite copies everything
+# under public/ verbatim into dist/, so this file lands at dist/_headers on
+# every `npm run build`.
+#
+# Space Builders' build output (verified with a real `npm run build`
+# during this migration) is SIMPLER than netrunner/mail's own split
+# _headers: every icon (src/assets/icons/*.png) and voice clip (src/assets/
+# voice/*.mp3) is loaded through a real ES import — import.meta.glob(...
+# '?url') in core/voice.js/ui.js, plain `?url` imports in main.js — never
+# a runtime string path, so Vite content-hashes ALL of them, exactly like
+# its own JS/CSS bundle. dist/assets/ is therefore uniformly hashed (no
+# unhashed art mixed in, unlike netrunner's Phaser sprites loaded via
+# `this.load.image(key, "assets/...")` runtime strings) — one blanket rule
+# is correct here, not netrunner/mail's extension-scoped split. Re-verify
+# with a real build if a future asset ever gets loaded by runtime string
+# path instead (it would land in dist/assets/ unhashed, mixed in with the
+# hashed files this rule assumes are the only thing there).
+
+# Vite's build output (JS/CSS bundle + every game asset) — all content-
+# hashed, safe to cache forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Entry points — always revalidate so a redeploy is visible on the next load.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/teacher-guide.html
+  Cache-Control: public, max-age=0, must-revalidate
