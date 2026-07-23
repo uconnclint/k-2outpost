@@ -1,0 +1,114 @@
+/* overlay.css — pointer-events shell for DOM UI layered over a canvas/WebGL/
+   Phaser stage (k-2outpost's recipe), safe-area insets, the shared
+   --ce-min-tap tap-target token, dom/ui.js's <dialog> baseline, and a
+   portrait rotate-notice block (mail's #rotate-notice concept). Every class
+   here is opt-in by name, so linking this file never fights a game's
+   existing layout. */
+
+:root {
+  --ce-min-tap: 44px;
+}
+
+/* ---- pointer-events overlay ----
+   Put your canvas/WebGL/Phaser root BEHIND #ce-ui-root in stacking order.
+   Empty space in the overlay lets taps fall through to the game underneath;
+   any real control opts back in with .ce-hit (or is one of the common
+   interactive tags/roles listed below). */
+#ce-ui-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+#ce-ui-root .ce-hit,
+#ce-ui-root button,
+#ce-ui-root a,
+#ce-ui-root input,
+#ce-ui-root select,
+#ce-ui-root textarea,
+#ce-ui-root [role="button"] {
+  pointer-events: auto;
+}
+
+/* ---- safe-area insets (notches, iPad rounded corners, gesture bars) ---- */
+.ce-safe-top    { padding-top: max(12px, env(safe-area-inset-top)); }
+.ce-safe-bottom { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.ce-safe-left   { padding-left: max(12px, env(safe-area-inset-left)); }
+.ce-safe-right  { padding-right: max(12px, env(safe-area-inset-right)); }
+
+/* ---- shared tap-target baseline (dom/ui.js's button()/MIN_TAP_CLASS) ---- */
+.ce-btn {
+  min-width: var(--ce-min-tap);
+  min-height: var(--ce-min-tap);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- native <dialog> baseline (dom/ui.js's dialog()) ---- */
+.ce-dialog {
+  border: none;
+  border-radius: 16px;
+  padding: 0;
+  max-width: min(92vw, 560px);
+  max-height: min(88vh, 720px);
+}
+.ce-dialog::backdrop {
+  background: rgba(20, 16, 30, 0.55);
+}
+.ce-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 8px;
+}
+.ce-dialog-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.ce-dialog-body {
+  padding: 8px 16px 16px;
+  overflow-y: auto;
+}
+.ce-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 0 16px 16px;
+}
+
+/* ---- portrait rotate-notice ----
+   Markup: <div id="ce-rotate-notice"><div class="ce-rotate-card">
+     <h1>...</h1><p>...</p></div></div>
+   Hidden by default; a game opts in with .ce-rotate-lock-portrait (or the
+   rarer .ce-rotate-lock-landscape) on <body>. */
+#ce-rotate-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 16, 30, 0.92);
+}
+.ce-rotate-card {
+  max-width: 480px;
+  padding: 24px 28px;
+  border-radius: 24px;
+  background: #fffdf6;
+  color: #2b2f45;
+  text-align: center;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+.ce-rotate-card h1 { margin: 0 0 8px; font-size: clamp(1.4rem, 3.6vw, 2rem); }
+.ce-rotate-card p  { margin: 0; font-size: clamp(0.95rem, 2.4vw, 1.1rem); line-height: 1.5; }
+
+@media (orientation: portrait) {
+  body.ce-rotate-lock-portrait #ce-rotate-notice { display: flex; }
+}
+@media (orientation: landscape) {
+  body.ce-rotate-lock-landscape #ce-rotate-notice { display: flex; }
+}
+
+.ce-hidden { display: none !important; }
