@@ -14,8 +14,7 @@
 
 import { GRID } from './constants.js';
 import { BUILDINGS_BY_ID } from './catalog.js';
-
-const SAVE_KEY = 'space-builders-save-v1';
+import { CE, PRIMARY_SAVE_KEY, LEGACY_SAVE_KEY } from '../engine-bridge.js';
 
 class Emitter {
   constructor() { this.map = new Map(); }
@@ -116,33 +115,82 @@ export function recomputeStatics() {
 }
 
 // ---------------- save / load ----------------
+// A thin facade over ctx.save (CE.save, see ../engine-bridge.js) that
+// keeps the ORIGINAL four functions' exact signatures and true/false
+// return contract — main.js's `else if (!load()) newGame();` and
+// `if (hasSave()) bootContinue...` still work unmodified.
+//
+// ctx.save itself already did the hard part at module-eval time (before
+// any of these functions are ever called): its own construction-time
+// loadFor() checked the primary key, then — only if that was empty —
+// space-builders-save-v1 (this file's old raw localStorage key, now the
+// LEGACY key, adopted via engine-bridge.js's migrateLegacySave and left
+// byte-for-byte untouched in storage, exactly as core/save.js's contract
+// promises). CE.save.get() below always returns SOMETHING (real adopted/
+// loaded data, or fresh {v:1, buildings:[], uidCounter:1} defaults if
+// neither key existed) — it can't by itself distinguish "there really was
+// a save" from "these are just the defaults", which is the one thing the
+// original raw-localStorage version of these four functions COULD tell
+// apart (a present-vs-absent key). hasSave() below is what still answers
+// that question, by checking storage directly — same as the original —
+// and load()/save() are written to agree with it, not with CE.save.get()'s
+// content.
+//
+// save()/load() are the ONLY place `state` (this module's own plain
+// object, `export const` — mutated in place, never reassigned, per every
+// other module's live-reference expectations) and ctx.save's live object
+// ever exchange data; nothing aliases the two together, so ctx.save's
+// own reset()/useSlot() reassigning ITS internal object never orphans
+// anything on our side.
 
 export function save() {
   try {
-    const data = {
-      v: 1,
-      buildings: state.buildings,
-      uidCounter: state.uidCounter,
-    };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    // patch() + flush() (not just save(), which only SCHEDULES a
+    // debounced write) to preserve the original's fully synchronous
+    // localStorage.setItem — every caller (the 20s autosave interval,
+    // beforeunload, the save-game event) keeps its original "definitely
+    // landed before this call returns" guarantee. ctx.save's own
+    // pagehide/visibilitychange auto-flush (wired inside core/save.js)
+    // becomes a harmless no-op backup on top of this, not a replacement
+    // for it — belt and suspenders, per the migration brief.
+    CE.save.patch({ v: 1, buildings: state.buildings, uidCounter: state.uidCounter });
+    CE.save.flush();
     events.emit('saved');
     return true;
   } catch { return false; }
 }
 
+// Checks BOTH storage locations a real prior session could have written
+// to — the engine's primary key (where construction-time adoption AND
+// every future save() lands) and the pre-engine legacy key (still
+// checked so this answers correctly even in the eval-order-agnostic case
+// where something asks before ctx.save's own construction-time adoption
+// has run). Matches the original's semantics exactly: a raw key-presence
+// check, never a content inspection — an empty-but-present save (e.g. a
+// kid who broomed away every building right before a session ended)
+// still counts as "yes, Keep Building exists", same as before.
 export function hasSave() {
-  try { return !!localStorage.getItem(SAVE_KEY); } catch { return false; }
+  try { return !!(localStorage.getItem(PRIMARY_SAVE_KEY) || localStorage.getItem(LEGACY_SAVE_KEY)); } catch { return false; }
 }
 
+// reset() first (clears ctx.save's own live object + any pending timer,
+// writing fresh defaults immediately — see core/save.js), THEN
+// removeItem() (undoes that immediate write) — order matters: reset()
+// itself always writes synchronously, so undoing it has to come second,
+// or the key would still exist afterward. Net effect on storage matches
+// the original exactly: the primary key goes back to genuinely absent,
+// not just present-with-empty-data, so hasSave() reports false again
+// until the next real save() — same as a fresh install. The legacy key
+// is never touched here (or anywhere) — untouched forever, by design.
 export function clearSave() {
-  try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
+  try { CE.save.reset(); } catch { /* ignore */ }
+  try { localStorage.removeItem(PRIMARY_SAVE_KEY); } catch { /* ignore */ }
 }
 
 export function load() {
+  if (!hasSave()) return false; // mirrors the original's `if (!raw) return false;`
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return false;
-    const d = JSON.parse(raw);
+    const d = CE.save.get(); // already adopted-or-loaded by ctx.save's own construction-time logic
     state.buildings = [];
     state.grid.clear();
     state.uidCounter = d.uidCounter || 1;
