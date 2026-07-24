@@ -7,7 +7,9 @@
 // animation function takes an optional trailing `gates` object
 // (`{quietCelebrations, reducedMotion}` — core/feedback.js passes this
 // automatically) and dampens itself under reducedMotion.
-// DOM-only — syntax-checked, not unit-tested (see docs/CONTRACTS.md "Tests").
+// DOM-only — mostly syntax-checked; the class-toggle micro-anims are unit-tested headlessly
+// against a mock classList that rejects space-containing tokens the way browsers do
+// (test/dom.fx.test.mjs; see docs/CONTRACTS.md "Tests").
 
 import { el } from './ui.js';
 
@@ -52,11 +54,16 @@ function ensureStyles() {
   document.head.appendChild(style);
 }
 
-function restartAnim(target, cls) {
+// classList.add/remove reject tokens containing spaces, so the base class and the reduced-motion
+// modifier are passed separately — never as one "a b" string. The modifier is always removed
+// first so a reduced-motion run doesn't leave a stale `ce-fx-reduced` behind when the setting
+// flips back mid-session.
+function restartAnim(target, cls, reduced) {
   if (!target) return;
-  target.classList.remove(cls);
+  target.classList.remove(cls, 'ce-fx-reduced');
   void target.offsetWidth; // force reflow so re-adding the class restarts the animation
   target.classList.add(cls);
+  if (reduced) target.classList.add('ce-fx-reduced');
 }
 
 /**
@@ -119,7 +126,7 @@ export function burst(target, opts, gates) {
 export function boing(target, gates) {
   if (!target) return;
   ensureStyles();
-  restartAnim(target, (gates && gates.reducedMotion) ? 'ce-fx-boing ce-fx-reduced' : 'ce-fx-boing');
+  restartAnim(target, 'ce-fx-boing', !!(gates && gates.reducedMotion));
 }
 
 /**
@@ -131,7 +138,7 @@ export function boing(target, gates) {
 export function wiggle(target, gates) {
   if (!target) return;
   ensureStyles();
-  restartAnim(target, (gates && gates.reducedMotion) ? 'ce-fx-wiggle ce-fx-reduced' : 'ce-fx-wiggle');
+  restartAnim(target, 'ce-fx-wiggle', !!(gates && gates.reducedMotion));
 }
 
 /**
@@ -143,7 +150,7 @@ export function wiggle(target, gates) {
 export function shake(target, gates) {
   if (!target) return;
   ensureStyles();
-  restartAnim(target, (gates && gates.reducedMotion) ? 'ce-fx-shake ce-fx-reduced' : 'ce-fx-shake');
+  restartAnim(target, 'ce-fx-shake', !!(gates && gates.reducedMotion));
 }
 
 /**

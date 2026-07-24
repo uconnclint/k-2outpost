@@ -266,6 +266,19 @@ export class TickedLobbyRoom extends RoomDO {
   }
 
   handleJoin(ws, msg) {
+    // One seat per socket: a repeat join from the same socket is answered idempotently with the
+    // seat it already has. Without this, the orphaned first entry stays connected:true forever
+    // and everyoneDone waits on a phantom racer — the room can never finish.
+    if (ws.__lobbyId && this.room.players.has(ws.__lobbyId)) {
+      this.send(ws, this.formatJoined(this.room.players.get(ws.__lobbyId)));
+      return;
+    }
+    if (this.room.phase !== 'lobby') {
+      // Lobby-only: a countdown/mid-race join would add a racer the finish condition waits on.
+      this.send(ws, { type: 'busy', phase: this.room.phase });
+      try { ws.close(1013, 'match in progress'); } catch { /* gone */ }
+      return;
+    }
     if (connectedHumans(this.room).length >= this.config.maxHumans) {
       this.send(ws, { type: 'full' });
       try { ws.close(1013, 'room full'); } catch { /* gone */ }

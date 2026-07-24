@@ -24,6 +24,7 @@ export function createRoundRunner(options = {}) {
   let round = 0;
   let score = 0;
   let firstTry = true;
+  let resolved = false; // current round already answered correctly — double-tap guard
   let done = false;
   const timers = new Set();
 
@@ -67,6 +68,7 @@ export function createRoundRunner(options = {}) {
     if (done) return;
     if (round >= roundsTotal) { finish(); return; }
     firstTry = true;
+    resolved = false;
     onRound(round, roundsTotal, ctx);
   }
 
@@ -77,7 +79,10 @@ export function createRoundRunner(options = {}) {
    * @param {boolean} [opts.advance=true]  pass false to advance manually (call start() yourself)
    */
   function correct(opts = {}) {
-    if (done) return;
+    // `resolved` locks the round: a kid double-tapping the right answer during the advance
+    // delay must count one round and one point, not two of each.
+    if (done || resolved) return;
+    resolved = true;
     if (firstTry) score++;
     round++;
     if (opts.advance === false) return;
@@ -94,7 +99,7 @@ export function createRoundRunner(options = {}) {
   function reset(newRounds) {
     clearAllTimers();
     if (Number.isInteger(newRounds) && newRounds > 0) roundsTotal = newRounds;
-    round = 0; score = 0; firstTry = true; done = false;
+    round = 0; score = 0; firstTry = true; resolved = false; done = false;
   }
 
   /** Stops the runner and clears every pending timer — call from the game's own destroy(). */

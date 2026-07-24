@@ -55,7 +55,12 @@ export function createEmitter() {
     try { fn(type, data); } catch (err) { reportListenerError(err); }
   }
 
-  return { on, off, emit };
+  /** Removes every listener of every type — the emitter half of a context teardown. */
+  function clear() {
+    listeners.clear();
+  }
+
+  return { on, off, emit, clear };
 }
 
 function reportListenerError(err) {

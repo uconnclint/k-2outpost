@@ -40,6 +40,11 @@ export class SnapshotRelayRoom extends RoomDO {
    *   `moderation.cleanText`
    * @param {number} [options.maxPeers]  no cap by default; a join over the
    *   cap is closed with WebSocket code 1013 ("try again later")
+   * @param {number} [options.maxSnapshotItems=4000]  cap on a persisted
+   *   snapshot's items array; an over-cap write is rejected whole
+   * @param {(item: object) => boolean} [options.validateItem]  per-game item
+   *   schema check (kind/coordinates/fields); one failing item rejects the
+   *   whole snapshot write — a partial world overwrite is worse than none
    */
   constructor(ctx, env, options = {}) {
     super(ctx, env);
@@ -49,6 +54,8 @@ export class SnapshotRelayRoom extends RoomDO {
       : DEFAULT_TEXT_FIELDS;
     this.sanitizeText = typeof options.sanitizeText === 'function' ? options.sanitizeText : cleanText;
     this.maxPeers = Number.isInteger(options.maxPeers) ? options.maxPeers : null;
+    this.maxSnapshotItems = Number.isInteger(options.maxSnapshotItems) ? options.maxSnapshotItems : 4000;
+    this.validateItem = typeof options.validateItem === 'function' ? options.validateItem : null;
   }
 
   async onJoin(ws, _meta, _request) {
@@ -76,8 +83,9 @@ export class SnapshotRelayRoom extends RoomDO {
     if (!meta || !meta.id) return; // onJoin hasn't finished / attachment missing
     switch (msg.type) {
       case 'move': {
-        const x = Number(msg.x) || 0;
-        const y = Number(msg.y) || 0;
+        // `Number(v) || 0` lets Infinity through (truthy) — finite or nothing.
+        const x = Number.isFinite(Number(msg.x)) ? Number(msg.x) : 0;
+        const y = Number.isFinite(Number(msg.y)) ? Number(msg.y) : 0;
         ws.serializeAttachment({ ...meta, x, y });
         this.broadcast({ type: 'state', id: meta.id, x, y }, ws);
         return;
@@ -105,7 +113,9 @@ export class SnapshotRelayRoom extends RoomDO {
       case 'sync-state': {
         const snapshot = msg.snapshot ? this.sanitizeSnapshot(msg.snapshot) : null;
         if (snapshot) await this.ctx.storage.put(SNAPSHOT_KEY, { snapshot, updatedAt: Date.now() });
-        if (msg.to) this.broadcast({ type: 'sync-state', id: meta.id, to: msg.to, snapshot }, ws);
+        // An invalid snapshot is dropped outright — never persisted, never relayed (a peer
+        // answering a sync-request with garbage just goes unanswered, same as having none).
+        if (msg.to && snapshot) this.broadcast({ type: 'sync-state', id: meta.id, to: msg.to, snapshot }, ws);
         return;
       }
       default:
@@ -133,16 +143,26 @@ export class SnapshotRelayRoom extends RoomDO {
   }
 
   /**
-   * Scrubs every item's `textFields` before a snapshot is stored or relayed
-   * — a modified client can't plant unfiltered text in the persisted world
-   * that every later joiner then receives (the Phase 0.5 wonderglade patch).
+   * Validates a snapshot's shape and scrubs every item's `textFields` before it is stored or
+   * relayed — a modified client can't plant unfiltered text OR arbitrary junk in the persisted
+   * world that every later joiner then receives (the Phase 0.5 wonderglade patch, extended).
+   * The shape contract: a plain object with an `items` array of plain objects, at most
+   * `maxSnapshotItems` long, every item passing `validateItem` when configured. Anything else
+   * answers null — the caller drops the write whole rather than persisting a partial world.
+   * Never mutates the input.
    * @param {object} snapshot
-   * @returns {object}
+   * @returns {object|null} a sanitized copy, or null when rejected
    */
   sanitizeSnapshot(snapshot) {
-    if (snapshot && Array.isArray(snapshot.items)) {
-      snapshot.items = snapshot.items.map((item) => this.sanitizeFields(item));
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) return null;
+    if (!Array.isArray(snapshot.items)) return null;
+    if (snapshot.items.length > this.maxSnapshotItems) return null;
+    const items = [];
+    for (const item of snapshot.items) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+      if (this.validateItem && !this.validateItem(item)) return null;
+      items.push(this.sanitizeFields(item));
     }
-    return snapshot;
+    return { ...snapshot, items };
   }
 }

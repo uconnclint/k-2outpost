@@ -46,6 +46,13 @@ function probe(storage) {
   }
 }
 
+// The probe proves storage worked at construction time, but managed profiles can revoke it
+// mid-session (policy refresh, private-mode purge) — a later read throwing must degrade to
+// "no data", never crash a load.
+function readItem(storage, key) {
+  try { return storage.getItem(key); } catch { return null; }
+}
+
 function safeParse(raw) {
   if (raw == null) return { ok: false };
   try {
@@ -155,7 +162,7 @@ export function createSave(options = {}) {
   // turn (first one with usable data, after migrate(), wins).
   function loadFor(slotIndex) {
     const key = primaryKey(slotIndex);
-    const primary = safeParse(storage.getItem(key));
+    const primary = safeParse(readItem(storage, key));
     if (primary.ok && isMergeable(primary.value)) {
       return { ...cloneDefaults(defaults), ...primary.value };
     }
@@ -164,7 +171,7 @@ export function createSave(options = {}) {
     // which slot it belongs to, and slots are opt-in for new games.
     if (slotCount === 0) {
       for (const legacyKey of legacyKeys) {
-        const legacy = safeParse(storage.getItem(legacyKey));
+        const legacy = safeParse(readItem(storage, legacyKey));
         if (!legacy.ok) continue;
         const migrated = tryMigrate(legacy.value, legacyKey);
         if (isMergeable(migrated)) {
@@ -196,16 +203,24 @@ export function createSave(options = {}) {
   }
 
   // Auto-wired so a kid closing the tab (or the OS switching apps on an
-  // iPad) doesn't lose the last few debounced seconds of play.
+  // iPad) doesn't lose the last few debounced seconds of play. Handlers are
+  // named + kept so destroy() can unhook them (a scene-restarting game must
+  // not accumulate one flush listener per restart).
+  let removeAutoFlush = () => {};
   (function wireAutoFlush() {
     try {
       if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
-      window.addEventListener('pagehide', () => flush());
-      if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'hidden') flush();
-        });
-      }
+      const onPageHide = () => flush();
+      const onVisibility = () => {
+        if (document.visibilityState === 'hidden') flush();
+      };
+      window.addEventListener('pagehide', onPageHide);
+      const hasDoc = typeof document !== 'undefined' && typeof document.addEventListener === 'function';
+      if (hasDoc) document.addEventListener('visibilitychange', onVisibility);
+      removeAutoFlush = () => {
+        try { window.removeEventListener('pagehide', onPageHide); } catch { /* ignore */ }
+        if (hasDoc) { try { document.removeEventListener('visibilitychange', onVisibility); } catch { /* ignore */ } }
+      };
     } catch { /* listener wiring failed — flush() is still callable manually */ }
   })();
 
@@ -230,6 +245,13 @@ export function createSave(options = {}) {
     /** Write immediately, synchronously, bypassing the debounce. */
     flush,
 
+    /** Final flush, then teardown: clears the debounce timer and the page-lifecycle listeners. Idempotent. */
+    destroy() {
+      flush();
+      removeAutoFlush();
+      removeAutoFlush = () => {};
+    },
+
     /** Reset to a fresh copy of `defaults` and persist immediately. */
     reset() {
       if (timer) { clearTimeout(timer); timer = null; }
@@ -246,13 +268,13 @@ export function createSave(options = {}) {
     /** @param {number} i @returns {boolean} whether slot i has any saved data */
     api.hasSlot = function hasSlot(i) {
       if (!Number.isInteger(i) || i < 0 || i >= slotCount) return false;
-      return safeParse(storage.getItem(primaryKey(i))).ok;
+      return safeParse(readItem(storage, primaryKey(i))).ok;
     };
 
     /** @param {number} i @returns {object|null} slot i's raw data, WITHOUT switching to it (for title-screen slot signs) */
     api.peekSlot = function peekSlot(i) {
       if (!Number.isInteger(i) || i < 0 || i >= slotCount) return null;
-      const parsed = safeParse(storage.getItem(primaryKey(i)));
+      const parsed = safeParse(readItem(storage, primaryKey(i)));
       return parsed.ok && isMergeable(parsed.value) ? { ...parsed.value } : null;
     };
 

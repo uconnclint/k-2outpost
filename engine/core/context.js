@@ -71,7 +71,7 @@ const NOOP_FACTORIES = {
  *   { createAudio, createSpeech, createFeedback } — lets this module's own
  *   test build a context without audio.js/speech.js/feedback.js existing.
  *   Never use this in game code; real games get the real modules automatically.
- * @returns {{save:object, settings:object, audio:object, speech:object, feedback:object, progress:object, random:object, events:object}}
+ * @returns {{save:object, settings:object, audio:object, speech:object, feedback:object, progress:object, random:object, events:object, destroy:() => void}}
  */
 export function createGameContext(options = {}) {
   const { gameId } = options;
@@ -132,5 +132,21 @@ export function createGameContext(options = {}) {
 
   const events = createEmitter();
 
-  return { save, settings, audio, speech, feedback, progress, random, events };
+  // One-call teardown for the whole bundle (a game's own destroy/scene-exit hook): the save's
+  // last debounced write lands FIRST, then everything that ticks, listens, or speaks stops.
+  // Idempotent, and every step is isolated — one service failing to tear down never blocks the
+  // rest. Services built by _factories test stubs may lack these hooks; optional-chaining keeps
+  // destroy() safe there too.
+  let destroyed = false;
+  function destroy() {
+    if (destroyed) return;
+    destroyed = true;
+    try { save.destroy?.(); } catch { /* flush best-effort */ }
+    try { audio.destroy?.(); } catch { /* ignore */ }
+    try { speech.stop?.(); } catch { /* ignore */ }
+    try { settings.destroy?.(); } catch { /* ignore */ }
+    try { events.clear?.(); } catch { /* ignore */ }
+  }
+
+  return { save, settings, audio, speech, feedback, progress, random, events, destroy };
 }

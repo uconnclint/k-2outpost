@@ -19,6 +19,12 @@ const DurableObjectBase = await resolveDurableObjectBase();
 
 const validPid = (pid) => typeof pid === 'string' && /^[a-zA-Z0-9-]{8,64}$/.test(pid);
 
+// Kid-supplied ids index these records, and the pid validator happily accepts "toString" or
+// "constructor" — on a plain object those hit inherited Object.prototype members (register
+// then throws assigning .name onto a built-in function). A null prototype makes every id just
+// a key. Storage round-trips restore plain objects, so loads must re-strip via this too.
+const bareRecord = (source) => Object.assign(Object.create(null), source);
+
 /** Monday of the current week as "YYYY-MM-DD" — leaderboards reset here. */
 export function weekKey(now = new Date()) {
   const d = new Date(now);
@@ -47,10 +53,10 @@ export class TeamsAndBoards extends DurableObjectBase {
     this.maxWpm = options.maxWpm ?? 250;
     this.blocklist = options.blocklist;
 
-    this.store = { players: {}, teams: {} };
+    this.store = { players: bareRecord(), teams: bareRecord() };
     ctx.blockConcurrencyWhile(async () => {
       const saved = await ctx.storage.get('store');
-      if (saved) this.store = saved;
+      if (saved) this.store = { players: bareRecord(saved.players), teams: bareRecord(saved.teams) };
     });
   }
 
@@ -97,6 +103,8 @@ export class TeamsAndBoards extends DurableObjectBase {
     let body = {};
     if (request.method === 'POST') {
       try { body = await request.json(); } catch { body = {}; }
+      // JSON "null"/primitives parse without throwing but would blow up destructuring below.
+      if (!body || typeof body !== 'object') body = {};
     }
 
     if (path === '/api/register' && request.method === 'POST') {

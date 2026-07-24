@@ -100,6 +100,10 @@ export function createRoomClient(options = {}) {
   }
 
   function scheduleReconnect() {
+    // Sole gate for the retry loop: every socket-loss path (close event,
+    // createSocket() throwing synchronously) funnels through here, so
+    // `reconnect: false` and close() hold no matter which path fired.
+    if (closed || !shouldReconnect) return;
     const delay = nextBackoffDelay(attempt, backoffMs);
     attempt++;
     reconnectTimer = setTimeoutFn(connect, delay);
@@ -149,7 +153,6 @@ export function createRoomClient(options = {}) {
     ws.addEventListener('close', () => {
       ws = null;
       events.onClose?.();
-      if (closed || !shouldReconnect) return;
       scheduleReconnect();
     });
 

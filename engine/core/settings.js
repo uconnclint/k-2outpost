@@ -85,7 +85,11 @@ export function createSettings(options = {}) {
   const seedDefaults = { ...extraDefaults, ...BUILTIN_DEFAULTS };
 
   let state;
-  const existing = safeParseObject(storage.getItem(key));
+  // Post-probe reads still guard: managed profiles can revoke storage mid-session, and a
+  // throwing read must degrade to "no saved settings", never crash startup.
+  let existingRaw = null;
+  try { existingRaw = storage.getItem(key); } catch { /* revoked after probe */ }
+  const existing = safeParseObject(existingRaw);
   if (existing) {
     // Anything already chosen (including a kid's own un-mute) always wins;
     // seedDefaults only fills in keys this blob doesn't have yet.
@@ -135,6 +139,11 @@ export function createSettings(options = {}) {
       if (typeof fn !== 'function') return () => {};
       listeners.add(fn);
       return () => listeners.delete(fn);
+    },
+
+    /** Drops every onChange listener — the settings half of a context teardown. Idempotent. */
+    destroy() {
+      listeners.clear();
     },
 
     /**

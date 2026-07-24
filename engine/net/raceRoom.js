@@ -36,16 +36,30 @@
 //   {type:'reset'}                            broadcast when the host resets
 //   {type:'full'}                             sent to a socket rejected for being over capacity
 //                                              (immediately followed by a 1013 close)
+//   {type:'busy', phase}                      sent to a socket that connected mid-race
+//                                              (countdown/racing/finished) — joining is
+//                                              lobby-only; followed by a 1013 close. The legacy
+//                                              race-share.js client ignores the unknown type and
+//                                              surfaces the close as "couldn't join".
 //
 // CLIENT -> SERVER
 //   {type:'start', text}     host only, lobby phase only; `text` is the full passage
-//                             the host already picked — this server never chooses one
+//                             the host already picked — this server never chooses one.
+//                             Scrubbed server-side (moderation.cleanText: whitespace
+//                             normalized, banned content rejects the whole start —
+//                             kid-visible text is never trusted client-side per house
+//                             rule 3); a rejected passage simply starts no race.
 //   {type:'progress', index} anyone, mid-race; `index` = characters correctly typed so
 //                             far (an ABSOLUTE count — converted to the outbound
-//                             fraction server-side), safe to send on every keystroke
+//                             fraction server-side), safe to send on every keystroke.
+//                             Server-side the count is MONOTONIC (never decreases) and
+//                             only lands once the gun has fired — progress sent during
+//                             the countdown (before startAt) is dropped, so nobody can
+//                             finish a race that hasn't started.
 //   {type:'reset'}            host only; returns everyone to the lobby, roster kept
 
 import { TickedLobbyRoom, humans, connectedHumans, joinRoom, leaveRoom, startNow, resetToLobby } from './tickedLobbyRoom.js';
+import { cleanText } from './moderation.js';
 
 const DEFAULT_COUNTDOWN_MS = 4000; // no source for the exact value (worker is lost) — Matchmaker's own default
 const DEFAULT_AFTER_FIRST_FINISH_MS = 75 * 1000; // stragglers' grace window, same rationale as Matchmaker
@@ -129,6 +143,8 @@ export class RaceRoom extends TickedLobbyRoom {
    * @param {number} [options.afterFirstFinishMs]  straggler grace window (default 75s)
    * @param {number} [options.maxTextLen=2000]  passage length cap (defensive; the
    *   protocol has no source-specified limit since the original worker is lost)
+   * @param {string[]} [options.blocklist]  extra game-specific banned words for the
+   *   passage scrub (same option TeamsAndBoards takes)
    */
   constructor(ctx, env, options = {}) {
     const maxRaceMs = options.maxRaceMs ?? DEFAULT_MAX_RACE_MS;
@@ -142,6 +158,7 @@ export class RaceRoom extends TickedLobbyRoom {
       computeResults: (room) => computeRaceResults(room),
     });
     this.maxTextLen = options.maxTextLen ?? DEFAULT_MAX_TEXT_LEN;
+    this.blocklist = options.blocklist;
     this.nextPlace = 0;
     this.nextNumber = 0;
     this.room.text = '';
@@ -151,6 +168,13 @@ export class RaceRoom extends TickedLobbyRoom {
   // sends one — the WebSocket upgrade itself is the join) -----------------
 
   async onJoin(ws, _meta, _request) {
+    if (this.room.phase !== 'lobby') {
+      // Joining is lobby-only: a mid-race connect would add a racer everyoneDone waits on —
+      // one late join could strand the whole race un-finishable.
+      this.send(ws, { type: 'busy', phase: this.wirePhase() });
+      try { ws.close(1013, 'race in progress'); } catch { /* already gone */ }
+      return;
+    }
     if (connectedHumans(this.room).length >= this.config.maxHumans) {
       this.send(ws, { type: 'full' });
       try { ws.close(1013, 'room full'); } catch { /* already gone */ }
@@ -158,7 +182,7 @@ export class RaceRoom extends TickedLobbyRoom {
     }
     const now = this.now();
     const id = 'r' + (++this.nextId);
-    const meta = { number: ++this.nextNumber, progress: 0, wpm: 0, finished: false, place: null };
+    const meta = { number: ++this.nextNumber, progress: 0, lastIndex: 0, wpm: 0, finished: false, place: null };
     const player = joinRoom(this.room, id, meta, now, this.config);
     ws.__lobbyId = id;
     this.send(ws, this.formatJoined(player));
@@ -180,17 +204,31 @@ export class RaceRoom extends TickedLobbyRoom {
   handleStart(ws, msg) {
     const id = ws.__lobbyId;
     if (!id || id !== this.hostId() || this.room.phase !== 'lobby') return;
-    const text = typeof msg.text === 'string' ? msg.text.trim().slice(0, this.maxTextLen) : '';
+    const raw = typeof msg.text === 'string' ? msg.text : '';
+    // Host-written, every-racer-visible text: scrub server-side (house rule 3). cleanText
+    // normalizes whitespace and answers the replacement ('') for banned content — which
+    // rejects the whole start, same as an empty passage: better no race than a '...' race.
+    const text = cleanText(raw, { maxLen: this.maxTextLen, replacement: '', blocklist: this.blocklist });
     if (!text) return;
     this.room.text = text;
     const event = startNow(this.room, this.now(), this.config);
-    if (event) this.broadcast(this.formatStart());
+    if (event) {
+      this.broadcast(this.formatStart());
+      // The ticker stops itself when a race finishes; a rematch's countdown needs it back or
+      // the room wedges in countdown forever (the reproduced second-race hang).
+      this.ensureTicker();
+    }
   }
 
   handleProgress(ws, msg) {
     const id = ws.__lobbyId;
     if (!id) return;
-    if (this.room.phase !== 'countdown' && this.room.phase !== 'ticking') return;
+    // Progress lands while ticking, or in the sliver after the gun (now >= startAt) before the
+    // next tick flips the phase — so first keystrokes are never dropped. Anything genuinely
+    // during the countdown is discarded: nobody finishes a race that hasn't started.
+    const gunFired = this.room.phase === 'ticking'
+      || (this.room.phase === 'countdown' && this.room.startAt != null && this.now() >= this.room.startAt);
+    if (!gunFired) return;
     const player = this.room.players.get(id);
     if (!player || player.ghost || player.finished) return;
     const justFinished = this.applyInput(player, msg, this.now());
@@ -200,7 +238,10 @@ export class RaceRoom extends TickedLobbyRoom {
   applyInput(player, msg, now) {
     const len = this.room.text ? this.room.text.length : 0;
     if (!len || typeof msg.index !== 'number' || !Number.isFinite(msg.index)) return false;
-    const index = Math.max(0, Math.min(len, Math.floor(msg.index)));
+    // Monotonic: a client-reported index can only move forward, so a glitching (or mischievous)
+    // client can't rewind its car or wobble the standings.
+    const index = Math.max(player.lastIndex ?? 0, Math.max(0, Math.min(len, Math.floor(msg.index))));
+    player.lastIndex = index;
     player.progress = progressFraction(index, len);
     player.wpm = wpmFromIndex(index, now - (this.room.startAt ?? now));
     if (index >= len && !player.finished) {
@@ -219,7 +260,7 @@ export class RaceRoom extends TickedLobbyRoom {
     this.room.text = '';
     this.nextPlace = 0;
     for (const p of this.room.players.values()) {
-      p.progress = 0; p.wpm = 0; p.finished = false; p.finishedAt = null; p.place = null;
+      p.progress = 0; p.lastIndex = 0; p.wpm = 0; p.finished = false; p.finishedAt = null; p.place = null;
     }
     this.broadcast({ type: 'reset' });
     this.broadcast(this.formatLobby());

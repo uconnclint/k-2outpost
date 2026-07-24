@@ -227,9 +227,13 @@ export function createTypingEngine(options = {}) {
       return true;
     }
     // never-block: a forgiving one-character undo (there's no error buffer —
-    // wrong keys never advanced the caret in the first place)
+    // wrong keys never advanced the caret in the first place). Since only CORRECT keys ever
+    // advanced `pos`, each backspace un-counts exactly one correct keystroke — otherwise
+    // retyping the same span inflates WPM, accuracy, and combo through churn.
     if (pos <= 0) return false;
     pos--;
+    correctCount = Math.max(0, correctCount - 1);
+    combo = Math.max(0, combo - 1);
     onEventFn('fix');
     return true;
   }

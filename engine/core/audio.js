@@ -26,12 +26,6 @@ function resolveAudioContextClass(injected) {
   return null;
 }
 
-function resolveAudioElementClass() {
-  if (typeof Audio !== 'undefined') return Audio;
-  if (typeof window !== 'undefined' && window.Audio) return window.Audio;
-  return null;
-}
-
 function midiToFreq(m) {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
@@ -51,6 +45,7 @@ function midiToFreq(m) {
  *   sfx: (name: string) => void,
  *   celebrate: (name: string) => void,
  *   music: {start: (id: string) => void, stop: () => void, duck: (on: boolean) => void},
+ *   destroy: () => void,
  *   unlocked: boolean,
  * }}
  */
@@ -63,7 +58,7 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
   let muted = readSettingsMuted();
   let unlocked = false;
   let musicDucked = false;
-  const assetCache = new Map(); // name -> HTMLAudioElement | null (null = missing/unavailable)
+  const assetCache = new Map(); // name -> AudioBuffer | pending Promise | null (null = missing/unavailable)
   const musicState = { id: null, timer: null, voices: [] };
 
   function readSettingsMuted() {
@@ -75,14 +70,17 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
 
   // settings is the single source of truth for mute: whenever it changes
   // (from a settings panel, another tab, whatever) the audio graph follows.
+  let unsubscribeSettings = null;
   if (settings && typeof settings.onChange === 'function') {
     try {
-      settings.onChange((key, value) => { if (key === 'muted') applyMuted(!!value); });
+      unsubscribeSettings = settings.onChange((key, value) => { if (key === 'muted') applyMuted(!!value); });
     } catch { /* settings stub without onChange support — fine, still readable via get() */ }
   }
 
+  let destroyed = false;
+
   function ensureContext() {
-    if (ctx) return ctx;
+    if (ctx || destroyed) return ctx;
     const AC = resolveAudioContextClass(audioContextClass);
     if (!AC) return null;
     try {
@@ -150,14 +148,16 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
 
   // ---- synth primitives, bus-agnostic (IceCream/scoop-troop envelope shape) ----
   // A cue's freq/gain envelopes are arrays of [timeOffsetSeconds, value] breakpoints.
-  function tone(bus, { wave = 'sine', freq, gain, duration = 0.2, detune = 0 } = {}) {
+  // `at` is an absolute AudioContext start time — the music scheduler passes each note's
+  // computed slot so notes land ON the beat; omitted (every SFX path) means "now".
+  function tone(bus, { wave = 'sine', freq, gain, duration = 0.2, detune = 0, at } = {}) {
     if (!ctx || !bus) return;
     try {
       const osc = ctx.createOscillator();
       const g = ctx.createGain();
       osc.type = wave;
       if (detune) osc.detune.value = detune;
-      const t0 = ctx.currentTime;
+      const t0 = at != null ? Math.max(at, ctx.currentTime) : ctx.currentTime;
       const freqEnv = freq && freq.length ? freq : [[0, 440]];
       freqEnv.forEach(([t, f], i) => {
         if (i === 0) osc.frequency.setValueAtTime(f, t0 + t);
@@ -177,7 +177,7 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
     } catch { /* a bad cue must never crash the game */ }
   }
 
-  function noise(bus, { duration = 0.08, gain, filterType = 'highpass', filterFreq = 1000, filterQ = 0.7 } = {}) {
+  function noise(bus, { duration = 0.08, gain, filterType = 'highpass', filterFreq = 1000, filterQ = 0.7, at } = {}) {
     if (!ctx || !bus) return;
     try {
       const size = Math.max(1, Math.floor(ctx.sampleRate * duration));
@@ -191,7 +191,7 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
       filter.frequency.value = filterFreq;
       filter.Q.value = filterQ;
       const g = ctx.createGain();
-      const t0 = ctx.currentTime;
+      const t0 = at != null ? Math.max(at, ctx.currentTime) : ctx.currentTime;
       const env = gain && gain.length ? gain : [[0, 0.5], [duration, 0.0001]];
       env.forEach(([t, v], i) => {
         const safe = Math.max(0.0001, v);
@@ -221,35 +221,45 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
   }
 
   // ---- asset-first with synth fallback (Math Arcade's pattern) ----
+  // Files are fetched + decoded into AudioBuffers and played through the SAME bus graph as the
+  // synths — full citizens of master volume, mute, ducking, and the compressor. The earlier
+  // HTMLAudioElement path sat outside the graph entirely: flipping mute mid-playback couldn't
+  // silence it, and duck()/the gentle-ears compressor never applied.
   function loadFile(name, url) {
     if (assetCache.has(name)) return Promise.resolve(assetCache.get(name));
-    const AudioCtor = resolveAudioElementClass();
-    if (!AudioCtor || typeof fetch === 'undefined') { assetCache.set(name, null); return Promise.resolve(null); }
-    return fetch(url, { method: 'HEAD' })
+    if (!ctx || typeof fetch === 'undefined' || typeof ctx.decodeAudioData !== 'function') {
+      assetCache.set(name, null);
+      return Promise.resolve(null);
+    }
+    const pending = fetch(url)
       .then((res) => {
         if (!res || !res.ok) throw new Error('missing audio asset');
-        const a = new AudioCtor(url);
-        assetCache.set(name, a);
-        return a;
+        return res.arrayBuffer();
       })
+      .then((buf) => ctx.decodeAudioData(buf))
+      .then((decoded) => { assetCache.set(name, decoded); return decoded; })
       .catch(() => { assetCache.set(name, null); return null; });
+    assetCache.set(name, pending); // concurrent plays of a still-loading cue share one fetch
+    return pending;
   }
 
   function playAssetOrSynth(name, bus, spec) {
     const url = files && files[name];
-    // Only worth an async HEAD-check when there's a real chance of playing a
-    // file: a configured url AND an Audio element in this environment. That
-    // keeps the common "no files configured" / "no Audio in Node" cases
-    // synchronous instead of leaving a silent gap for one microtask.
-    const AudioCtor = url ? resolveAudioElementClass() : null;
-    if (!url || !AudioCtor) { playCueSpec(bus, spec); return; }
-    loadFile(name, url).then((a) => {
-      if (!a) { playCueSpec(bus, spec); return; }
+    // Only worth the async load when a file can actually decode in this environment; the
+    // common "no files configured" / plain-Node cases stay synchronous instead of leaving a
+    // silent gap for one microtask.
+    if (!url || !ctx || typeof ctx.decodeAudioData !== 'function') { playCueSpec(bus, spec); return; }
+    loadFile(name, url).then((buffer) => {
+      if (!buffer) { playCueSpec(bus, spec); return; }
       try {
-        const clone = a.cloneNode();
-        clone.volume = 0.8;
-        const p = clone.play();
-        if (p && p.catch) p.catch(() => playCueSpec(bus, spec));
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        const g = ctx.createGain();
+        g.gain.value = 0.8;
+        src.connect(g);
+        g.connect(bus);
+        src.start(ctx.currentTime);
+        src.onended = () => { try { src.disconnect(); g.disconnect(); } catch { /* ignore */ } };
       } catch { playCueSpec(bus, spec); }
     });
   }
@@ -288,6 +298,7 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
           if (pitch != null) {
             const isAccent = pitch === 1;
             noise(musicBus, {
+              at: voice.nextTime, // land ON the beat, not "whenever this tick ran"
               duration: Math.min(dur, 0.12),
               gain: [[0, isAccent ? vol * 1.4 : vol * 0.8], [Math.min(dur, 0.12), 0.0001]],
               filterType: isAccent ? 'bandpass' : 'highpass',
@@ -299,6 +310,7 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
           const pitches = Array.isArray(pitch) ? pitch : [pitch];
           pitches.forEach((p) => {
             tone(musicBus, {
+              at: voice.nextTime,
               wave: channel.wave || 'triangle',
               freq: [[0, midiToFreq(p)]],
               gain: [[0, 0.0001], [Math.max(0.02, dur * 0.35), vol], [dur, 0.0001]],
@@ -346,6 +358,25 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
     } catch { /* ignore */ }
   }
 
+  /** Stops music, unhooks the settings listener, and closes the AudioContext. Idempotent; every later call on this instance is a safe no-op. */
+  function destroy() {
+    if (destroyed) return;
+    destroyed = true;
+    musicStop();
+    if (typeof unsubscribeSettings === 'function') {
+      try { unsubscribeSettings(); } catch { /* ignore */ }
+      unsubscribeSettings = null;
+    }
+    if (ctx) {
+      try {
+        const p = ctx.close();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch { /* already closed or a fake without close() */ }
+    }
+    ctx = null; master = null; compressor = null; sfxBus = null; musicBus = null;
+    assetCache.clear();
+  }
+
   return {
     unlock,
     isMuted,
@@ -353,6 +384,7 @@ export function createAudio({ settings, cues = {}, music = {}, files = null, aud
     sfx,
     celebrate,
     music: { start: musicStart, stop: musicStop, duck: musicDuck },
+    destroy,
     get unlocked() { return unlocked; },
   };
 }

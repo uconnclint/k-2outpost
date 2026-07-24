@@ -2,8 +2,10 @@
 // Generalizes the plumbing every audited backend hand-rolled (voxel type,
 // wonderglade, poison candy, KeyQuest, Ink Rush, Word Wizard Arena): a peer
 // roster, safe broadcast (one dead socket never throws for the room), safe
-// message parsing (oversized/malformed frames are dropped, not crashes),
-// and an opt-in idle self-destruct alarm.
+// message parsing (oversized/malformed frames are dropped, not crashes), a
+// room-level exception boundary (a subclass handler that throws loses that
+// one message/join/leave — never the room; override `onError(err, phase,
+// ws)` to observe), and an opt-in idle self-destruct alarm.
 //
 // Hibernation API by default (Ink Rush's turf-room.js + WWA's worker/
 // room.mjs): `ctx.acceptWebSocket()` lets the runtime evict this DO between
@@ -144,7 +146,15 @@ export class RoomDO extends DurableObjectBase {
       server.addEventListener('error', () => { this._onRawClose(server, true); });
     }
 
-    await this.onJoin?.(server, readAttachment(server), request);
+    try {
+      await this.onJoin?.(server, readAttachment(server), request);
+    } catch (e) {
+      // A throwing onJoin must not leave a half-joined socket in the room; the client sees an
+      // immediate close and its reconnect/offline fallback takes over.
+      this._reportError(e, 'join', server);
+      if (!this.constructor.HIBERNATION) this._sockets.delete(server);
+      try { server.close(1011, 'join failed'); } catch { /* already gone */ }
+    }
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -158,12 +168,33 @@ export class RoomDO extends DurableObjectBase {
   async _onRawMessage(ws, raw) {
     const msg = safeParse(raw, this.maxMsgBytes ?? MAX_MSG_BYTES);
     if (msg === undefined) return; // oversized or malformed — silently dropped
-    await this.onMessage?.(ws, msg, readAttachment(ws));
+    try {
+      await this.onMessage?.(ws, msg, readAttachment(ws));
+    } catch (e) {
+      // The room-level exception boundary. Without it, one message that trips a subclass bug
+      // becomes an unhandled rejection (classic mode fires these handlers without awaiting
+      // them) and can take down a room full of kids; with it, the bad message is dropped, the
+      // socket stays up, and everyone else keeps playing.
+      this._reportError(e, 'message', ws);
+    }
   }
 
   async _onRawClose(ws, wasError) {
     if (!this.constructor.HIBERNATION) this._sockets.delete(ws);
-    await this.onLeave?.(ws, readAttachment(ws), wasError);
+    try {
+      await this.onLeave?.(ws, readAttachment(ws), wasError);
+    } catch (e) {
+      this._reportError(e, 'leave', ws);
+    }
+  }
+
+  // Route a caught subclass exception to the overridable onError hook; if THAT throws (or no
+  // hook exists), fall back to console.error so the failure at least reaches `wrangler tail`.
+  _reportError(err, phase, ws) {
+    try {
+      if (typeof this.onError === 'function') return this.onError(err, phase, ws);
+    } catch { /* a broken error hook must not re-throw into the boundary */ }
+    console.error(`RoomDO ${phase} handler failed:`, err);
   }
 
   // ---- idle self-destruct (opt-in; KeyQuest's TandemRoom recycle pattern) --
