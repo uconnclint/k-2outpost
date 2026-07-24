@@ -9,20 +9,25 @@ export interface CeSettings {
   set(key: string, value: any): void;
   onChange(fn: (key: string, value: any, all: Record<string, any>) => void): () => void;
   reducedMotion(): boolean;
+  destroy(): void;
 }
 
-export interface CeSave {
-  get(): any;
-  patch(partial: Record<string, any>): void;
+// TSave parameterizes the save blob's shape (goofy-rocket-lab's
+// createGameContext<SavedState> usage); it defaults to `any` so plain
+// untyped usage stays exactly as loose as before.
+export interface CeSave<TSave = any> {
+  get(): TSave;
+  patch(partial: Partial<TSave>): void;
   save(): void;
   flush(): void;
   reset(): void;
+  destroy(): void;
   persistent?: boolean;
   [extra: string]: any;
 }
 
-export interface GameContext {
-  save: CeSave;
+export interface GameContext<TSave = any> {
+  save: CeSave<TSave>;
   settings: CeSettings;
   audio: any;
   speech: any;
@@ -35,7 +40,8 @@ export interface GameContext {
     shuffle<T>(arr: T[]): T[];
     randInt(a: number, b: number): number;
   };
-  events: { on: Function; off: Function; emit: Function };
+  events: { on: Function; off: Function; emit: Function; clear: Function };
+  destroy(): void;
 }
 
-export function createGameContext(options: Record<string, any>): GameContext;
+export function createGameContext<TSave = any>(options: Record<string, any>): GameContext<TSave>;
