@@ -76,15 +76,19 @@ export function tapOrDrag(el, { onTap, onDragStart, onDragMove, onDragEnd, moveT
  * pointerup's trailing synthetic click doesn't double-fire onDrop.
  * @param {Element} draggable
  * @param {{onDrop: (event: Event) => void}} opts
- * @returns {{suppressNextClick: (ms?: number) => void}}
+ * @returns {{suppressNextClick: (ms?: number) => void, destroy: () => void}}
  */
 export function attachTapFallback(draggable, { onDrop } = {}) {
   let suppressUntil = 0;
-  draggable.addEventListener('click', (e) => {
+  function onClick(e) {
     if (Date.now() < suppressUntil) return; // a real drag just completed — ignore the synthetic click that follows it
     if (typeof onDrop === 'function') onDrop(e);
-  });
-  return { suppressNextClick(ms = 80) { suppressUntil = Date.now() + ms; } };
+  }
+  draggable.addEventListener('click', onClick);
+  return {
+    suppressNextClick(ms = 80) { suppressUntil = Date.now() + ms; },
+    destroy() { draggable.removeEventListener('click', onClick); },
+  };
 }
 
 /**

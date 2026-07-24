@@ -197,7 +197,9 @@ export class KeyboardDisplay {
     if (this.hintTimer) { this.hintTimer.destroy(); this.hintTimer = null; }
     if (this.hintKey) {
       const keyObj = this.keys[this.hintKey];
-      if (keyObj) {
+      // A destroyed GameObject drops its scene ref — repainting one throws
+      // (setColor on a Text whose canvas is gone), so skip visuals for corpses.
+      if (keyObj && keyObj.container.scene) {
         keyObj.container.setScale(1);
         this.drawKey(keyObj.bg, this.colors.keyInactive, this.colors.keyBorder);
         keyObj.text.setColor(hex(this.colors.text));
@@ -250,12 +252,21 @@ export class KeyboardDisplay {
     }
   }
 
-  /** Tear down every key's game objects and tweens. */
+  /**
+   * Tear down every key's game objects and tweens. Safe to call at ANY point,
+   * including from a shutdown hook added in create() — which Phaser runs AFTER
+   * its own DisplayList shutdown, i.e. after every child here is already a
+   * destroyed corpse (the KinderTyper ordering gotcha that used to make this
+   * throw via clearHint()'s repaint). Releases resources without repainting;
+   * idempotent, matching the CONTRACTS.md teardown rule.
+   */
   destroy() {
-    this.clearHint();
+    if (this.hintTween) { try { this.hintTween.stop(); } catch { /* tween plugin already torn down */ } this.hintTween = null; }
+    if (this.hintTimer) { try { this.hintTimer.destroy(); } catch { /* scene clock already torn down */ } this.hintTimer = null; }
+    this.hintKey = null;
     Object.values(this.keys).forEach((k) => {
-      this.scene.tweens.killTweensOf(k.container);
-      k.container.destroy();
+      try { this.scene.tweens?.killTweensOf(k.container); } catch { /* mid-shutdown — tweens die with the scene anyway */ }
+      k.container.destroy(); // Phaser no-ops on an already-destroyed object
     });
     this.keys = {};
   }

@@ -13,6 +13,7 @@
 const fallbacks = new Map(); // key -> fallback HTML string
 
 let guardInstalled = false;
+let guardObserver = null; // captured so uninstallAssetGuards() can disconnect it
 function installPaintGuard() {
   if (guardInstalled) return;
   if (typeof MutationObserver === 'undefined' || typeof document === 'undefined') return;
@@ -23,9 +24,10 @@ function installPaintGuard() {
     if (node.tagName === 'IMG') node.classList.add('ce-ras-reveal');
     if (node.querySelectorAll) node.querySelectorAll('img').forEach((img) => img.classList.add('ce-ras-reveal'));
   };
-  new MutationObserver((mutations) => {
+  guardObserver = new MutationObserver((mutations) => {
     for (const m of mutations) for (const n of m.addedNodes) reveal(n);
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  });
+  guardObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
 
 let styleInstalled = false;
@@ -80,6 +82,27 @@ export function img(key, url, { fallbackHtml = '', cls = '', alt = '' } = {}) {
   node.decoding = 'async';
   node.addEventListener('error', () => handleError(node, key), { once: true });
   return node;
+}
+
+/**
+ * Fully uninstall this module's page-level machinery: the paint-guard
+ * MutationObserver, the injected reveal <style>, the window.__ceAssetFallback
+ * hook, and every registered fallback. The guard and style are page-lifetime
+ * singletons by design (they serve every img() across screens), so ordinary
+ * games never call this — it exists for embedders/tests that tear a game out
+ * of a longer-lived page. Idempotent; the next img()/imgHtml() reinstalls.
+ * @returns {void}
+ */
+export function uninstallAssetGuards() {
+  if (guardObserver) { guardObserver.disconnect(); guardObserver = null; }
+  guardInstalled = false;
+  if (typeof document !== 'undefined') {
+    const style = document.querySelector('style[data-ce-assets]');
+    if (style) style.remove();
+  }
+  styleInstalled = false;
+  if (typeof window !== 'undefined' && window.__ceAssetFallback) delete window.__ceAssetFallback;
+  fallbacks.clear();
 }
 
 /**

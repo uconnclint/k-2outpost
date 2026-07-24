@@ -73,8 +73,10 @@ export function button({ label = '', onPress, sfx, cls = '', attrs = {} } = {}) 
  * A native <dialog> wired with a close button and optional backdrop-click-
  * to-close (scratchy's paper-dialog pattern, cleaned up to use the platform
  * element instead of a hand-rolled overlay div).
+ * The dialog is appended to document.body, so it outlives the screen that
+ * created it — call `destroy()` on the screen's teardown path to remove it.
  * @param {{id?: string, cls?: string, title?: string, body?: string|(Node|string)[], actions?: HTMLElement[], closeLabel?: string, closeOnBackdrop?: boolean}} opts
- * @returns {{el: HTMLDialogElement, open: Function, close: Function}}
+ * @returns {{el: HTMLDialogElement, open: Function, close: Function, destroy: Function}}
  */
 export function dialog({ id, cls = '', title = '', body, actions = [], closeLabel = 'Close', closeOnBackdrop = true } = {}) {
   const dlg = el('dialog', ['ce-dialog', cls].filter(Boolean).join(' '), id ? { id } : null);
@@ -97,6 +99,7 @@ export function dialog({ id, cls = '', title = '', body, actions = [], closeLabe
     el: dlg,
     open() { try { dlg.showModal(); } catch { dlg.setAttribute('open', ''); } },
     close() { try { dlg.close(); } catch { dlg.removeAttribute('open'); } },
+    destroy() { api.close(); dlg.remove(); }, // idempotent — remove() on a detached node is a no-op
   };
   return api;
 }
@@ -110,7 +113,8 @@ export function dialog({ id, cls = '', title = '', body, actions = [], closeLabe
  * it once (to restore on disarm) and only swaps it while armed.
  * @param {HTMLElement} btn
  * @param {{armedLabel?: string, armedMs?: number, armedCls?: string, onArm?: Function, onConfirm?: Function, sfx?: Function}} opts
- * @returns {{disarm: Function, armed: boolean}}
+ * @returns {{disarm: Function, armed: boolean, destroy: Function}} destroy disarms,
+ *   clears the auto-disarm timer, and detaches the click handler (idempotent)
  */
 export function armToConfirm(btn, { armedLabel = '❓', armedMs = 2600, armedCls = 'armed', onArm, onConfirm, sfx } = {}) {
   const restLabel = btn.textContent;
@@ -124,7 +128,7 @@ export function armToConfirm(btn, { armedLabel = '❓', armedMs = 2600, armedCls
     if (timer) { clearTimeout(timer); timer = null; }
   }
 
-  btn.addEventListener('click', () => {
+  function onClick() {
     if (armed) {
       doDisarm();
       if (typeof onConfirm === 'function') onConfirm();
@@ -136,9 +140,14 @@ export function armToConfirm(btn, { armedLabel = '❓', armedMs = 2600, armedCls
     if (typeof sfx === 'function') { try { sfx(); } catch { /* ignore */ } }
     if (typeof onArm === 'function') onArm();
     timer = setTimeout(doDisarm, armedMs);
-  });
+  }
+  btn.addEventListener('click', onClick);
 
-  return { disarm: doDisarm, get armed() { return armed; } };
+  return {
+    disarm: doDisarm,
+    get armed() { return armed; },
+    destroy() { doDisarm(); btn.removeEventListener('click', onClick); },
+  };
 }
 
 /**
@@ -146,10 +155,17 @@ export function armToConfirm(btn, { armedLabel = '❓', armedMs = 2600, armedCls
  * Reflects `settings.muted` immediately and stays in sync via
  * `settings.onChange`, so it's correct even when muted is toggled elsewhere
  * (a settings panel, a keyboard shortcut).
+ * The button subscribes to the settings store; if the button is removed while
+ * the settings live on (screen change inside one context), call the
+ * `ceDestroy()` function attached to the returned element to unsubscribe —
+ * it's an expando property rather than a changed return type so existing
+ * `parent.append(muteButton(...))` call sites keep working untouched.
+ * (`ctx.destroy()` also clears every settings listener, so this only matters
+ * for churn within a long-lived context.)
  * @param {{get: Function, set?: Function, onChange?: Function}} settings
  * @param {{unlock?: Function, setMuted?: Function}} [audio]
  * @param {{cls?: string, onLabel?: string, offLabel?: string}} [opts]
- * @returns {HTMLButtonElement}
+ * @returns {HTMLButtonElement & {ceDestroy: () => void}}
  */
 export function muteButton(settings, audio, { cls = '', onLabel = '🔊', offLabel = '🔇' } = {}) {
   const btn = button({
@@ -170,8 +186,13 @@ export function muteButton(settings, audio, { cls = '', onLabel = '🔊', offLab
     btn.setAttribute('aria-pressed', String(!muted));
   }
   sync();
+  let offChange = null;
   if (typeof settings.onChange === 'function') {
-    settings.onChange((key) => { if (key === 'muted') sync(); });
+    offChange = settings.onChange((key) => { if (key === 'muted') sync(); });
   }
+  btn.ceDestroy = () => {
+    if (typeof offChange === 'function') { try { offChange(); } catch { /* ignore */ } }
+    offChange = null;
+  };
   return btn;
 }
